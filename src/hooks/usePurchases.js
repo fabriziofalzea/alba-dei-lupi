@@ -62,6 +62,7 @@ export function usePurchases(userId = null) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [initialized, setInitialized] = useState(false);
+  const [prices, setPrices] = useState({}); // packId -> priceString localizzato (App Store)
 
   // ── Init RevenueCat (solo native) ──────────────────────────────────────────
   useEffect(() => {
@@ -81,6 +82,26 @@ export function usePurchases(userId = null) {
           setPurchasedPacks(packs);
           lsSet(packs);
           setInitialized(true);
+        }
+
+        // Prezzi REALI localizzati per lo store dell'utente (es. "$1.99", "3,99 €").
+        // Sovrascrive i fallback EUR hardcoded in PACKS così un utente non-EUR vede
+        // il prezzo che paga davvero (fix rischio rifiuto App Store / prezzo incoerente).
+        try {
+          const { current } = await RC.getOfferings();
+          const pkgs = current?.availablePackages ?? [];
+          const priceMap = {};
+          for (const p of pkgs) {
+            const id = p.identifier;                    // 'ombre' | 'villaggio' | 'narratore' | 'combo'
+            const ps = p.product?.priceString;          // già localizzato da StoreKit
+            if (id && ps) {
+              priceMap[id] = ps;
+              if (window.PACKS?.[id]) window.PACKS[id].price = ps; // muta il global letto dai display
+            }
+          }
+          if (!cancelled && Object.keys(priceMap).length) setPrices(priceMap);
+        } catch (e) {
+          console.warn('[usePurchases] getOfferings prices error (uso fallback hardcoded):', e?.message);
         }
       } catch (e) {
         console.warn('[usePurchases] RC init error, fallback localStorage:', e);
@@ -187,6 +208,7 @@ export function usePurchases(userId = null) {
     isLoading,        // boolean   — durante acquisto/restore
     error,            // string|null
     initialized,      // boolean   — RC configurato (solo native)
+    prices,           // {packId: priceString} — prezzi localizzati App Store (vuoto su web)
     purchasePackage,  // (packId: string) => Promise
     restorePurchases, // () => Promise
     isPackUnlocked,   // (packId: string) => boolean

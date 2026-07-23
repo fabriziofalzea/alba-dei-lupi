@@ -22,8 +22,8 @@ Regole comportamentali: vedi `../Jarvis/CLAUDE.md` (profilo utente, stile, proat
 | **App Store ID** | `id6764061104` |
 | **App Store URL** | `https://apps.apple.com/app/lupus-in-fabula/id6764061104` |
 | **Web (Vercel)** | `https://lupus-in-fabula-eight.vercel.app` |
-| **Stato** | v1.2 (build 3) in review Apple — inviata 2026-05-12 |
-| **Live** | v1.1 (build 2) — approvata 2026-05-12 |
+| **Stato** | v1.2 (build 3) live — approvata 2026-05-12, #104 categoria Famiglia al lancio |
+| **Live** | v1.2 (build 3) — dal 2026-05-12 |
 
 ---
 
@@ -47,10 +47,10 @@ Freemium con pack IAP:
 
 | Pack | Prezzo | Contenuto |
 |---|---|---|
-| Pack Ombre | €2,99 | strega, figlio_dei_lupi, cacciatore, medium |
-| Pack Villaggio | €2,99 | cupido, sindaco, sciamano, mitomane |
+| Pack Ombre | €1,99 | strega, figlio_dei_lupi, cacciatore, medium |
+| Pack Villaggio | €1,99 | cupido, sindaco, sciamano, mitomane |
 | Pack Narratore | €1,99 | Voce AI narratore |
-| Combo | €5,99 | Tutti e tre |
+| Combo | €4,99 | Tutti e tre |
 
 Prodotti App Store Connect: `pack_ombre`, `pack_villaggio`, `pack_narratore`, `pack_combo`.
 
@@ -61,13 +61,16 @@ Prodotti App Store Connect: `pack_ombre`, `pack_villaggio`, `pack_narratore`, `p
 | File | Contenuto |
 |---|---|
 | `AI_SYNC.md` | **Fonte di verità** — architettura, fix critici, to-do |
-| `NARRATOR_RECORDING_GUIDE.md` | Guida registrazione 30 MP3 statici narratore |
+| `NARRATOR_RECORDING_GUIDE.md` | Guida registrazione 31 MP3 statici narratore (IT) |
+| `NARRATOR_RECORDING_GUIDE_EN.md` | Stessa guida in inglese — audio EN non ancora registrato |
 | `src/App.jsx` | Entry point principale — `APP_STORE_URL`, `FIREBASE_CONFIG`, `PACKS`, `needsUpdate()` |
+| `src/i18n/translations.js` | Dizionari IT/EN (i18n, aggiunto 2026-07-22) |
+| `src/i18n/i18n.js` | Store lingua + `t()` + hook `useLanguage()` (i18n, aggiunto 2026-07-22) |
 | `src/hooks/usePurchases.js` | Hook RevenueCat — accetta `userId` per RC.logIn |
 | `api/speak.js` | Proxy ElevenLabs TTS |
 | `api/voices.js` | Lista voci ElevenLabs |
 | `vercel.json` | Config deploy Vercel |
-| `public/narrator/` | 31 MP3 statici narratore (risparmio ~94% API) |
+| `public/narrator/` | 31 MP3 statici narratore IT (risparmio ~94% API) — `public/narrator/en/` non ancora popolata |
 
 ---
 
@@ -118,7 +121,7 @@ open -a Xcode "/tmp/LupusInFabula.xcarchive"
 |---|---|---|---|
 | 1.0 | 1 | 2026-05-09 | ✅ Live |
 | 1.1 | 2 | 2026-05-09 | ✅ Live (fix paywall Voce AI) |
-| 1.2 | 3 | 2026-05-12 | ⏳ In review (RC login UID + force update) |
+| 1.2 | 3 | 2026-05-12 | ✅ Live (RC login UID + force update) |
 
 ---
 
@@ -131,7 +134,7 @@ open -a Xcode "/tmp/LupusInFabula.xcarchive"
 | 🟡 | Sign in with Apple — Xcode entitlement + Firebase provider Apple |
 | 🟡 | UX: feedback post-acquisto pack narratore |
 | 🟢 | Universal Links (`apple-app-site-association` su Vercel) |
-| 🟢 | Traduzioni EN — mercato internazionale |
+| ✅ | ~~Traduzioni EN~~ — sistema i18n IT/EN + audio narratore EN + prezzi localizzati FATTI in locale (branch `feat/i18n-en`, 2026-07-23), da rivedere e deployare — vedi AI_SYNC.md |
 
 ---
 

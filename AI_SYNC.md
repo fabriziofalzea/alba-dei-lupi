@@ -30,7 +30,7 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
 5. **Feature: Monetizzazione — UI Gate (Fase 1)**
    - Rimosso ruolo `lupo_alfa` (semplificazione roster).
    - Aggiunti campi `pack` ai ruoli: `strega`, `figlio_dei_lupi`, `cacciatore`, `medium` → pack `ombre`; `cupido`, `sindaco`, `sciamano`, `mitomane` → pack `villaggio`.
-   - Costante `PACKS`: `ombre` (€2,99), `villaggio` (€2,99), `narratore` (€1,99), `combo` (€5,99, include tutti e tre).
+   - Costante `PACKS`: `ombre` (€1,99), `villaggio` (€1,99), `narratore` (€1,99), `combo` (€4,99, include tutti e tre).
    - Role picker ristrutturato in card per pack: ruoli bloccati → opacity 0.55 + 🔒 badge + onClick apre `PaywallModal`.
    - `PaywallModal`: gestisce pack singoli, pack `narratore` (senza ruoli), pack `combo` (prezzi barrati + CTA upsell).
    - `purchasedPacks` in `localStorage` chiave `lif_purchased_packs`. Il bottone "Acquista" salva in localStorage (test UI, non IAP reale).
@@ -138,6 +138,24 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
     - `SetupModal` rimosso — era stato flaggato da Apple (Guideline 2.2) nella review della build 1.
     - Questi cambi erano già presenti localmente ma non committati — inclusi nel commit v1.1.
 
+21. **Feature: Sistema i18n IT/EN — lavoro in locale, NON deployato (2026-07-22)**
+    - *Obiettivo*: preparare la traduzione inglese dell'app senza toccare il comportamento italiano esistente.
+    - *Architettura*: due nuovi file — `src/i18n/translations.js` (dizionari `IT`/`EN`, struttura a namespace per schermata) e `src/i18n/i18n.js` (store esterno minimale con `useSyncExternalStore`, funzione `t(key, vars)` con fallback IT, hook `useLanguage()` per componenti reattivi).
+    - *Rilevamento lingua*: `navigator.language` al primo avvio (fallback IT se non IT/EN), poi override persistito in `localStorage['lif_lang']`. Nessuna dipendenza nuova installata — approccio idiomatico coerente con lo stile del codice esistente (stato globale + localStorage, come `lif_tts_mode`, `lif_el_key`, ecc.).
+    - *Switch lingua*: pulsante IT/EN in alto a sinistra su `HomeScreen` (unico punto in cui si cambia lingua — evita corner-case di cambio lingua a metà partita). `App()` e `HomeScreen` sottoscrivono `useLanguage()` per re-render reattivo; le altre schermate leggono `t()` al mount (si aggiornano perché vengono rimontate ad ogni cambio schermata).
+    - ⚠️ *Regola anti-regressione i18n (verifica code-review 2026-07-22)*: la propagazione del cambio lingua ai ~640 punti che chiamano `t()` funziona **perché `App()` (root) è sottoscritto a `useLanguage()` e NESSUN componente del file è memoizzato** — quindi al cambio lingua il root si ri-renderizza e trascina tutto l'albero. È corretto ma fragile: **se in futuro si introduce `React.memo`/`useMemo` su un componente, quel componente NON deve leggere la `t` dalla import globale ma consumarla da `useLanguage()` localmente**, altrimenti si congela sulla lingua precedente (bug subdolo). Non aggiungere memoizzazione senza questa accortezza.
+    - *ROLES / PACKS / NIGHT_NARRATION / NIGHT_STEPS*: rimangono oggetti mutabili module-level come prima (nessun refactor dei ~40 punti che li leggono per riferimento). Nuova funzione `applyLanguageToStaticData()` li **muta in place** con i testi della lingua corrente, chiamata all'avvio e ad ogni cambio lingua (`subscribeLang`). Le chiavi/id dei ruoli (`lupo`, `veggente`, ecc.) restano invariate — solo `name`/`description`/`tip` cambiano.
+    - *Terminologia EN*: nomi ruolo consolidati del genere Werewolf (Werewolf, Villager, Seer, Bodyguard, Witch, Hunter, Cupid, Mayor, Medium, Wolf Child, Shaman; "Mitomane" → **Mimic**, unico ruolo senza corrispettivo standard).
+    - *Narratore audio — punto critico*: `window.NARRATOR_STATIC_AUDIO` ristrutturato da mappa testo→file a mappa **lingua→chiave semantica→file** (`{it: {night_open: '/narrator/night_open.mp3', ...31 chiavi}, en: {}}`). `window.speakNarration(testo, chiave)` ora accetta una chiave opzionale; se il file per la lingua corrente non esiste, fallback automatico e trasparente sull'API ElevenLabs dal vivo (già multilingue, nessuna rottura). Tutti i ~15 punti del codice che chiamano `speakNarration`/`setNarrationAndPhase` sono stati aggiornati per passare la chiave giusta. **Effetto collaterale positivo**: il lookup per chiave (invece che per testo esatto) ha corretto un mismatch preesistente tra il testo di "alba con vittima" e il file statico corrispondente, che prima cadeva sempre sull'API per un carattere di differenza.
+    - *Audio EN*: ✅ **GENERATO E APPROVATO ALL'ASCOLTO da Fabrizio (2026-07-23)**, confronto diretto IT vs EN su tutte le 31 frasi (pagina di test temporanea `public/_voice_test.html`, RIMUOVERE prima del deploy). 31 MP3 in `public/narrator/en/` incisi con voce Daniel (`onwK4e9ZLuTAKqWW03F9`, madrelingua EN britannica) via `generate_narrator_audio_en.mjs` (gemello dello script IT, stesso proxy Vercel — nessuna API key locale). `NARRATOR_STATIC_AUDIO.en` popolato con le 31 chiavi → `/narrator/en/<file>.mp3`. Verificato: 31/31 file validi, chiavi en allineate 1:1 con it, build Vite pulita, file serviti dal dev server (HTTP 200 audio/mpeg), zero errori console. Ora l'inglese usa audio statici come l'italiano — risolto il rischio costo ElevenLabs ~16x segnalato dalla code-review (finding 🟡 #2). Testi in `NARRATOR_RECORDING_GUIDE_EN.md`.
+    - *Copertura traduzione*: tutte le schermate (Home, CreateGame, GameMaster, PlayerScreen, Profile+Avatar, Paywall, Tutorial/Onboarding, Privacy consent, Auth/login, History, force-update modal) + tutti i ruoli/pack/narrazione. Verificato a mano nel dev server locale (build Vite pulita, nessun errore console, toggle IT⇄EN live testato su Home/CreateGame/GameMaster/Paywall/Login/History/Tutorial).
+    - ✅ *Correzione (2026-07-23)*: `public/privacy.html` **era già bilingue IT/EN** (sezioni GDPR-compliant complete in entrambe le lingue, toggle JS vanilla funzionante, `setLang()`) — la nota precedente che lo dava "solo IT" era sbagliata, verificato e corretto ora. Nessuna azione necessaria su questo file.
+    - ✅ *UX fix (2026-07-23)*: il selettore lingua era presente solo su `HomeScreen`, quindi il consenso privacy e il tutorial di onboarding (le primissime schermate viste da un nuovo utente) apparivano sempre in italiano prima che si potesse cambiare lingua. Spostato il toggle su `PrivacyConsentModal` (ora usa `useLanguage()` invece del `t` globale non reattivo) — è la prima schermata in assoluto (z-index 999, sopra tutto). Verificato: toggle IT⇄EN istantaneo su questa schermata, build pulita.
+    - *Prezzi localizzati* ✅ **FIX 2026-07-23 (code-review finding 🟡 #1)**: prima i display mostravano i valori EUR hardcoded in `PACKS` anche a utenti non-EUR (rischio rifiuto App Store + prezzo incoerente col reale). Ora `usePurchases` legge `RC.getOfferings()` → `product.priceString` (già localizzato da StoreKit) e lo scrive in `window.PACKS[id].price`; tutti i 6 punti di display (PaywallModal, role picker, upsell combo) leggono `PACKS[id].price` e prendono quindi il prezzo reale localizzato su iOS. Su web/senza IAP `prices` resta `{}` e vale il fallback EUR hardcoded (nessuna regressione). `usePurchases` ora espone anche `prices`. Verificato: build pulita, web invariato, mutazione global funzionante, zero errori console. **Da testare su device/simulatore iOS con account sandbox StoreKit** (il path RevenueCat non è esercitabile dal dev server web).
+    - *Prezzi confermati (2026-07-23)*: i prezzi reali a listino sono quelli del codice — ombre/villaggio/narratore **€1,99**, combo **€4,99** (confermato da Fabrizio). La doc precedente (CLAUDE.md, memoria) che riportava €2,99/€5,99 era obsoleta ed è stata allineata. I fallback EUR hardcoded in `PACKS` sono quindi corretti; su iOS il `priceString` di RevenueCat li localizza comunque per store region.
+    - **NON deployato**: nessun `npx vercel --prod`, nessun `npx cap sync`, nessuna build Xcode. Modifiche solo su `src/App.jsx` (esteso, non riscritto) + 2 file nuovi in `src/i18n/`. Da rivedere prima di un eventuale deploy.
+    - *Cleanup post-review (2026-07-23)*: applicati 4 dei 7 finding 🟢 (verificati dead/sicuri, build pulita): nome fallback player localizzato (`getLang()==='en'?'Player':'Giocatore'`), `freeAppNote` EN senza valuta ambigua, `_speakBrowser` reso lang-aware (`utterance.lang`), rimossa entry morta `NIGHT_NARRATION.close` (residuo confermato dal commento a codice). **Lasciati intenzionalmente** (rischio > beneficio alla vigilia del deploy): #7 duplicazione ROLES/translations (refactor strutturale), #8 label toggle IT/EN (UX funzionante, non un bug), #9 suffissi plurale (trascurabile, stesso difetto già in IT).
+
 ## 📝 To-Do Aperti per l'Utente
 
 ### ✅ Completato
@@ -154,7 +172,7 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
 - **App Store Connect**: app `com.lupusinfabula.app` (ID: 6764061104) inviata per revisione il 3 maggio 2026. Build 2 selezionato. Classificazione 13+. Prezzi, screenshot, descrizione, keywords, privacy policy compilati.
 - **`APP_STORE_URL`**: aggiornato a `https://apps.apple.com/app/lupus-in-fabula/id6764061104`.
 - **v1.1 approvata e live** (2026-05-12): fix paywall Voce AI.
-- **v1.2 in review** (2026-05-12, build 3):
+- **v1.2 approvata e live** (2026-05-12, build 3 — #104 categoria Famiglia al lancio):
   - RC login con Firebase UID (`usePurchases(userId)`) — acquisti ora persistenti su cambio device
   - Force update via Firebase `config/minVersion` — modal bloccante se versione obsoleta
   - Fix `target="_blank"` link App Store nel modal force-update
@@ -173,7 +191,7 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
 
 ### 🟢 Opzionale (post-lancio)
 5. **Universal Links**: `apple-app-site-association` su Vercel.
-6. **Traduzioni EN**: mercato internazionale.
+6. ~~**Traduzioni EN**~~ → sistema i18n IT/EN implementato in locale (2026-07-22, punto #21) — **da rivedere e deployare**. Resta da fare: registrare i 31 audio narratore in inglese (vedi `NARRATOR_RECORDING_GUIDE_EN.md`), poi `npx vercel --prod` + `npx cap sync` quando Fabrizio approva.
 7. **Modello finanziario**: rivedere proiezioni senza costi ElevenLabs (MP3 statici 94%).
 
 ## 🚀 Comandi Deploy

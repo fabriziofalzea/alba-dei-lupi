@@ -80,16 +80,21 @@ senza mai chiamare l'API durante la partita.
 
 ---
 
-## Testi che restano dinamici (API — ~1-2 chiamate per turno)
+## Testi che restano dinamici (API)
 
-Questi testi contengono nomi dei giocatori e vengono ancora generati via API:
+**Aggiornamento (2026-07-22, refactor i18n):** nessuna delle frasi del narratore
+contiene più il nome del giocatore nel testo inviato a ElevenLabs — il nome compare
+solo a schermo (via Firebase), il testo audio è sempre fisso. Le 31 frasi sopra sono
+quindi TUTTE coperte da un file statico. Restano dinamiche (sempre via API) solo 2
+frasi mai registrate finora, non per via di nomi ma perché non hanno ancora un mp3:
 
-- **Alba con vittima**: *"L'alba arriva silenziosamente… [Nome] è stato trovato senza vita. I lupi hanno colpito nella notte."*
-- ~~Eliminazione di giorno~~ → ora **statica** (`day_victim_reveal.mp3`), il nome appare sui telefoni via Firebase.
-- **Veleno strega**: *"…Ma il veleno della strega ha colpito: [Nome] è stato trovato senza vita!"*
-- **Veggente + Criceto**: *"…Ma un'aura oscura si è abbattuta su [Nome] nella notte…"*
+- **Chiusura "Tutti, chiudano gli occhi."** (chiave `night_close`) — chiusura della fase di apertura notte.
+- **Apertura votazione** (chiave `voting_start`) — *"La discussione è finita. Il silenzio della votazione può cominciare. Scegliete dal vostro telefono."*
 
-Sono al massimo **2 API calls per turno** invece delle ~15 precedenti.
+Il lookup dei file statici ora avviene per **chiave semantica** (es. `night_open`,
+`dawn_victim_reveal`) invece che per testo esatto — vedi `window.NARRATOR_STATIC_AUDIO`
+in `src/App.jsx`, ora organizzata per lingua (`it` / `en`). Vedi
+`NARRATOR_RECORDING_GUIDE_EN.md` per la versione inglese, non ancora registrata.
 
 ---
 
