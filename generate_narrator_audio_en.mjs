@@ -32,6 +32,12 @@ const FILES = [
   { file: 'mitomane_close.mp3',
     text: 'The Mimic, close your eyes.' },
 
+  // Minion (Indemoniato)
+  { file: 'indemoniato_open.mp3',
+    text: 'The Minion, open your eyes. On your phone, the faces that serve the pack: from tonight their fate is yours.' },
+  { file: 'indemoniato_close.mp3',
+    text: 'The Minion, close your eyes.' },
+
   { file: 'veggente_open.mp3',
     text: 'The Seer, open your eyes. Choose who you want to observe tonight.' },
   { file: 'veggente_close.mp3',
@@ -105,11 +111,25 @@ async function generateFile({ file, text }) {
     console.log(`  ⏭  ${file} — già presente, skip`);
     return;
   }
-  const res = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceId: VOICE_ID }),
-  });
+  // Con una chiave locale (node --env-file=.env …) chiama ElevenLabs direttamente;
+  // altrimenti passa dal proxy Vercel. Parametri voce identici a api/speak.js.
+  const localKey = process.env.ELEVENLABS_API_KEY;
+  const res = localKey
+    ? await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+        method: 'POST',
+        headers: { 'xi-api-key': localKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          speed: 1.4,
+          voice_settings: { stability: 0.70, similarity_boost: 0.85, style: 0.35, use_speaker_boost: true },
+        }),
+      })
+    : await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceId: VOICE_ID }),
+      });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`ElevenLabs ${res.status}: ${err}`);

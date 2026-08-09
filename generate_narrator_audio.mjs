@@ -36,6 +36,12 @@ const FILES = [
   { file: 'mitomane_close.mp3',
     text: 'Il Mitomane, chiuda gli occhi.' },
 
+  // Indemoniato
+  { file: 'indemoniato_open.mp3',
+    text: "L'Indemoniato, apra gli occhi. Sul tuo telefono i volti che servono il branco: da stanotte il loro destino è il tuo." },
+  { file: 'indemoniato_close.mp3',
+    text: "L'Indemoniato, chiuda gli occhi." },
+
   // Veggente
   { file: 'veggente_open.mp3',
     text: 'Il Veggente, apra gli occhi. Scegli chi vuoi osservare questa notte.' },
@@ -125,12 +131,27 @@ async function generateFile({ file, text }) {
     return;
   }
 
-  // Chiama il proxy Vercel (la chiave ElevenLabs è già configurata lì)
-  const res = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceId: VOICE_ID }),
-  });
+  // Con una chiave locale (node --env-file=.env …) chiama ElevenLabs direttamente;
+  // altrimenti passa dal proxy Vercel, che ha la sua chiave lato server.
+  // I parametri voce sono identici a quelli di api/speak.js: i nuovi file devono
+  // suonare uguali ai 31 già registrati.
+  const localKey = process.env.ELEVENLABS_API_KEY;
+  const res = localKey
+    ? await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+        method: 'POST',
+        headers: { 'xi-api-key': localKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          speed: 1.4,
+          voice_settings: { stability: 0.70, similarity_boost: 0.85, style: 0.35, use_speaker_boost: true },
+        }),
+      })
+    : await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceId: VOICE_ID }),
+      });
 
   if (!res.ok) {
     const err = await res.text();

@@ -23,6 +23,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Purchases as RCPurchases } from '@revenuecat/purchases-capacitor';
+import { trackEvent } from '../lib/analytics';
 
 // ─── CONFIGURA QUI LA TUA CHIAVE REVENUECAT ─────────────────────────────────
 const REVENUECAT_API_KEY = 'appl_NnVZQQimQgRSTecAruqJeKQZtja';
@@ -143,6 +144,7 @@ export function usePurchases(userId = null) {
     }
 
     // Native: RevenueCat reale
+    trackEvent('purchase_attempt', { pack_id: packId });
     setIsLoading(true);
     try {
       const RC = PurchasesRef.current;
@@ -161,13 +163,16 @@ export function usePurchases(userId = null) {
       const newPacks = entitlementsToPackIds(customerInfo);
       setPurchasedPacks(newPacks);
       lsSet(newPacks);
+      trackEvent('purchase_success', { pack_id: packId });
       return { success: true };
     } catch (e) {
       if (e?.code === 'PURCHASE_CANCELLED') {
         // Utente ha cancellato: non è un errore
+        trackEvent('purchase_cancel', { pack_id: packId });
         return { cancelled: true };
       }
       console.error('[usePurchases] purchasePackage error:', e?.message);
+      trackEvent('purchase_error', { pack_id: packId, message: e?.message });
       setError(e?.message || 'Errore durante l\'acquisto');
       return { error: e?.message };
     } finally {

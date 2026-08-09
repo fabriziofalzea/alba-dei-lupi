@@ -153,7 +153,7 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
     - ✅ *UX fix (2026-07-23)*: il selettore lingua era presente solo su `HomeScreen`, quindi il consenso privacy e il tutorial di onboarding (le primissime schermate viste da un nuovo utente) apparivano sempre in italiano prima che si potesse cambiare lingua. Spostato il toggle su `PrivacyConsentModal` (ora usa `useLanguage()` invece del `t` globale non reattivo) — è la prima schermata in assoluto (z-index 999, sopra tutto). Verificato: toggle IT⇄EN istantaneo su questa schermata, build pulita.
     - *Prezzi localizzati* ✅ **FIX 2026-07-23 (code-review finding 🟡 #1)**: prima i display mostravano i valori EUR hardcoded in `PACKS` anche a utenti non-EUR (rischio rifiuto App Store + prezzo incoerente col reale). Ora `usePurchases` legge `RC.getOfferings()` → `product.priceString` (già localizzato da StoreKit) e lo scrive in `window.PACKS[id].price`; tutti i 6 punti di display (PaywallModal, role picker, upsell combo) leggono `PACKS[id].price` e prendono quindi il prezzo reale localizzato su iOS. Su web/senza IAP `prices` resta `{}` e vale il fallback EUR hardcoded (nessuna regressione). `usePurchases` ora espone anche `prices`. Verificato: build pulita, web invariato, mutazione global funzionante, zero errori console. **Da testare su device/simulatore iOS con account sandbox StoreKit** (il path RevenueCat non è esercitabile dal dev server web).
     - *Prezzi confermati (2026-07-23)*: i prezzi reali a listino sono quelli del codice — ombre/villaggio/narratore **€1,99**, combo **€4,99** (confermato da Fabrizio). La doc precedente (CLAUDE.md, memoria) che riportava €2,99/€5,99 era obsoleta ed è stata allineata. I fallback EUR hardcoded in `PACKS` sono quindi corretti; su iOS il `priceString` di RevenueCat li localizza comunque per store region.
-    - **NON deployato**: nessun `npx vercel --prod`, nessun `npx cap sync`, nessuna build Xcode. Modifiche solo su `src/App.jsx` (esteso, non riscritto) + 2 file nuovi in `src/i18n/`. Da rivedere prima di un eventuale deploy.
+    - **Deploy tentato 2026-07-23**: branch mergiato in `master` e pushato su GitHub. Web (`vercel --prod`) **bloccato**: token Vercel scaduto, serve `vercel login` (richiede email/browser di Fabrizio). iOS: versione bumpata a 1.3(4), archive completato con successo (`releases/LupusInFabula-1.3-build4.xcarchive`), ma **upload ad App Store Connect bloccato** da contratto Developer Program da accettare (vedi dettaglio in `CLAUDE.md` → Rilasci). Nessuna submission per la review effettuata — solo Fabrizio può sbloccare entrambi i punti.
     - *Cleanup post-review (2026-07-23)*: applicati 4 dei 7 finding 🟢 (verificati dead/sicuri, build pulita): nome fallback player localizzato (`getLang()==='en'?'Player':'Giocatore'`), `freeAppNote` EN senza valuta ambigua, `_speakBrowser` reso lang-aware (`utterance.lang`), rimossa entry morta `NIGHT_NARRATION.close` (residuo confermato dal commento a codice). **Lasciati intenzionalmente** (rischio > beneficio alla vigilia del deploy): #7 duplicazione ROLES/translations (refactor strutturale), #8 label toggle IT/EN (UX funzionante, non un bug), #9 suffissi plurale (trascurabile, stesso difetto già in IT).
 
 ## 📝 To-Do Aperti per l'Utente
@@ -189,10 +189,15 @@ Questo file serve a mantenere sincronizzati gli assistenti IA (come me e Claude)
 3. **Voce AI feedback post-acquisto**: UX — indicare dove trovare la feature dopo acquisto pack narratore.
 4. **Force update attivazione**: quando serve, impostare `config/minVersion` su Firebase Console.
 
+### ✅ Completato (2026-07-24)
+- ~~**Traduzioni EN**~~ → sistema i18n completo, audio EN registrato, ASO EN, screenshot EN, **v1.3(4) inviata in revisione Apple**. 15 paesi attivati. Dettaglio completo in `CLAUDE.md` → sezioni Rilasci e Monitoraggio stats.
+- **Monitoraggio stats**: RevenueCat via API (`monitor_revenuecat.mjs`) + App Store Connect via browser. Baseline salvata in memoria Jarvis (`project_lupus.md`).
+
 ### 🟢 Opzionale (post-lancio)
 5. **Universal Links**: `apple-app-site-association` su Vercel.
-6. ~~**Traduzioni EN**~~ → sistema i18n IT/EN implementato in locale (2026-07-22, punto #21) — **da rivedere e deployare**. Resta da fare: registrare i 31 audio narratore in inglese (vedi `NARRATOR_RECORDING_GUIDE_EN.md`), poi `npx vercel --prod` + `npx cap sync` quando Fabrizio approva.
+6. **Deploy web**: bloccato da token Vercel scaduto — fare `vercel login` poi `npx vercel --prod` per allineare il sito alla v1.3 EN.
 7. **Modello finanziario**: rivedere proiezioni senza costi ElevenLabs (MP3 statici 94%).
+8. **Instrumentazione analytics**: nessun evento Firebase Analytics nel codice — priorità prima di qualsiasi spesa pubblicitaria (vedi piano vendite).
 
 ## 🚀 Comandi Deploy
 

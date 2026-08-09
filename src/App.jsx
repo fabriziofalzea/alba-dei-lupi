@@ -7,6 +7,8 @@ import { IT as I18N_IT, EN as I18N_EN } from './i18n/translations';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import 'firebase/compat/auth';
+import 'firebase/compat/analytics';
+import { trackEvent } from './lib/analytics';
 
 // Riassegna per i riferimenti globali
 window.firebase = firebase;
@@ -105,6 +107,8 @@ window.NARRATOR_STATIC_AUDIO = {
     cupido_close: '/narrator/cupido_close.mp3',
     mitomane_open: '/narrator/mitomane_open.mp3',
     mitomane_close: '/narrator/mitomane_close.mp3',
+    indemoniato_open: '/narrator/indemoniato_open.mp3',
+    indemoniato_close: '/narrator/indemoniato_close.mp3',
     veggente_open: '/narrator/veggente_open.mp3',
     veggente_close: '/narrator/veggente_close.mp3',
     guardia_open: '/narrator/guardia_open.mp3',
@@ -139,6 +143,8 @@ window.NARRATOR_STATIC_AUDIO = {
     cupido_close: '/narrator/en/cupido_close.mp3',
     mitomane_open: '/narrator/en/mitomane_open.mp3',
     mitomane_close: '/narrator/en/mitomane_close.mp3',
+    indemoniato_open: '/narrator/en/indemoniato_open.mp3',
+    indemoniato_close: '/narrator/en/indemoniato_close.mp3',
     veggente_open: '/narrator/en/veggente_open.mp3',
     veggente_close: '/narrator/en/veggente_close.mp3',
     guardia_open: '/narrator/en/guardia_open.mp3',
@@ -369,7 +375,8 @@ const FIREBASE_CONFIG = {
   projectId:         "lupus-in-fabula-c1c3e",
   storageBucket:     "lupus-in-fabula-c1c3e.firebasestorage.app",
   messagingSenderId: "994430330214",
-  appId:             "1:994430330214:web:d6ba507899d79968b054a7"
+  appId:             "1:994430330214:web:d6ba507899d79968b054a7",
+  measurementId:     "G-C4H6ZQC34H"
 };
 
 /* ================================================================
@@ -461,6 +468,17 @@ const ROLES = {
     category:'speciale', wakeOrder:8, nightAction:true,
     description:'Una volta per partita, durante la notte, puoi richiamare l\'anima di un giocatore eliminato e riportarlo in vita con il suo ruolo originale. Il risorto non sa nulla di ciò che è accaduto durante la sua assenza.',
     tip:'Aspetta il momento giusto. Resuscitare un Veggente o una Strega a metà partita può ribaltare tutto.',
+  },
+  indemoniato: {
+    id:'indemoniato', name:'Indemoniato', team:'villaggio', color:'#dc2626', icon:'😈',
+    abbr:'In', pack:'ombre',
+    category:'speciale', wakeOrder:3.6, nightAction:true,
+    // team 'villaggio' → conta come villico nel calcolo vittoria e la Veggente lo vede innocente.
+    // winsWith 'lupi'  → ma esulta con il branco quando vincono loro.
+    knowsWolves: true,
+    winsWith: 'lupi',
+    description:'Sei un traditore in mezzo al villaggio. Non hai poteri, ma conosci l\'identità dei lupi fin dalla prima notte. La Veggente ti vede innocente. Vinci se vincono i lupi.',
+    tip:'Fingi di dare la caccia al branco: guida i sospetti lontano dai tuoi alleati.',
   }
 };
 
@@ -482,6 +500,7 @@ const ROLE_VISUALS = {
   medium:         { gradient:'linear-gradient(145deg,#080812,#14142e,#080818)', glow:'#818cf8', particle:'🌀' },
   cacciatore:     { gradient:'linear-gradient(145deg,#051800,#103000,#0a1800)', glow:'#65a30d', particle:'🎯' },
   mitomane:       { gradient:'linear-gradient(145deg,#001a15,#003a30,#001a20)', glow:'#0d9488', particle:'🎭' },
+  indemoniato:    { gradient:'linear-gradient(145deg,#1a0000,#3a0505,#1a0008)', glow:'#dc2626', particle:'😈' },
   villico:        { gradient:'linear-gradient(145deg,#0d0a00,#201800,#0d0900)', glow:'#a16207', particle:'🌾' },
 };
 
@@ -492,6 +511,7 @@ const NIGHT_NARRATION = {
   open:     { open: 'La notte cala sul villaggio. Il silenzio inghiotte ogni suono, ogni movimento.', close: 'Tutti, chiudano gli occhi.' },
   cupido:   { open: 'Cupido, apra gli occhi. Scegli i due cuori che batteranno all\'unisono — la tua freccia deciderà il loro destino per sempre.', close: 'Cupido, chiuda gli occhi.' },
   mitomane: { open: 'Il Mitomane, apra gli occhi. Scegli la maschera che indosserai per tutta la partita.', close: 'Il Mitomane, chiuda gli occhi.' },
+  indemoniato: { open: 'L\'Indemoniato, apra gli occhi. Sul tuo telefono i volti che servono il branco: da stanotte il loro destino è il tuo.', close: 'L\'Indemoniato, chiuda gli occhi.' },
   veggente: { open: 'Il Veggente, apra gli occhi. Scegli chi vuoi osservare questa notte.', close: 'Il Veggente, chiuda gli occhi.' },
   guardia:  { open: 'La Guardia del Corpo, apra gli occhi. Chi proteggerai stanotte con la tua vita?', close: 'La Guardia del Corpo, chiuda gli occhi.' },
   figlio_dei_lupi: { open: 'Il Figlio dei Lupi, apra gli occhi. Il sangue chiama, ma ancora non risponde. Osserva in silenzio.', close: 'Il Figlio dei Lupi, chiuda gli occhi.' },
@@ -508,12 +528,24 @@ const NIGHT_STEPS = [
   { key:'veggente', label:'Veggente',     icon:'🔮', hasRole:true,  roleId:'veggente' },
   { key:'guardia',         label:'Guardia',         icon:'🛡️', hasRole:true,  roleId:'guardia' },
   { key:'figlio_dei_lupi', label:'Figlio dei Lupi',  icon:'🐺', hasRole:true,  roleId:'figlio_dei_lupi' },
+  { key:'indemoniato',     label:'Indemoniato',      icon:'😈', hasRole:true,  roleId:'indemoniato', firstNightOnly:true },
   { key:'lupi',            label:'Lupi',             icon:'🐺', hasRole:true,  roleId:'lupo' },
   { key:'strega',   label:'Strega',       icon:'🧙‍♀️', hasRole:true,  roleId:'strega' },
   { key:'medium',   label:'Medium',       icon:'👁️', hasRole:true,  roleId:'medium' },
   { key:'sciamano', label:'Sciamano',     icon:'🪬', hasRole:true,  roleId:'sciamano' },
   // 'close' rimosso: il testo alba è ora prefisso del dawn reveal (evita duplicati)
 ];
+
+// Sequenza degli step attivi per una notte. Va calcolata UNA VOLTA quando la notte
+// inizia e poi congelata: nightStep è un indice nell'array, quindi un ruolo che cambia
+// a notte in corso (Mitomane che eredita, Strega che avvelena) riordinerebbe l'array
+// e farebbe puntare l'indice allo step sbagliato.
+function buildNightSteps(states, dayNumber) {
+  const present = new Set(Object.values(states).filter(p => p.alive).map(p => p.role));
+  return NIGHT_STEPS.filter(s =>
+    (!s.hasRole || present.has(s.roleId)) && (!s.firstNightOnly || dayNumber === 1)
+  );
+}
 
 /* ================================================================
    I18N — applica la lingua corrente ai dati statici (ROLES, PACKS,
@@ -561,6 +593,20 @@ subscribeLang(applyLanguageToStaticData);
    ================================================================ */
 function uid(len=8) {
   return Math.random().toString(36).substr(2, len).toUpperCase();
+}
+
+// Token che identifica il dispositivo per la guardia anti-furto del QR.
+// Attenzione: Safari e la WebView nativa hanno localStorage separati, quindi lo stesso
+// telefono ne genererebbe due diversi — per questo il deep link se lo porta dietro.
+function getDeviceToken() {
+  try {
+    let tk = localStorage.getItem('lif_device_token');
+    if (!tk) {
+      tk = Math.random().toString(36).substring(2);
+      localStorage.setItem('lif_device_token', tk);
+    }
+    return tk;
+  } catch { return 'nostorage'; }
 }
 
 function shuffleArray(arr) {
@@ -966,7 +1012,7 @@ function QRCodeBox({url, size=120}) {
 /* ================================================================
    ROLE CARD (flip)
    ================================================================ */
-function RoleCard({role, playerName, flipped, onFlip, userPhoto}) {
+function RoleCard({role, playerName, flipped, onFlip, onHide, userPhoto}) {
   const r = ROLES[role];
   const v = ROLE_VISUALS[role] || { gradient:'linear-gradient(145deg,#0d0d0d,#1a1a1a)', glow:'#e2c97e', particle:'⭐' };
   if (!r) return null;
@@ -1036,6 +1082,14 @@ function RoleCard({role, playerName, flipped, onFlip, userPhoto}) {
                 <p className="text-white/50 text-[9px] uppercase tracking-widest">{t('roleCard.welcome')}</p>
                 <p className="font-cinzel text-white text-sm font-bold leading-tight">{playerName}</p>
               </div>
+              {/* Ri-nasconde la carta: utile se qualcuno ti si avvicina dopo che l'hai girata */}
+              {onHide && (
+                <button onClick={(e)=>{ e.stopPropagation(); onHide(); }}
+                        className="ml-auto flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all active:scale-95"
+                        style={{background:'rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.2)', color:'rgba(255,255,255,0.8)'}}>
+                  🙈 {t('roleCard.hide')}
+                </button>
+              )}
             </div>
 
             {/* Icona ruolo */}
@@ -1411,7 +1465,7 @@ const PACKS = {
     price: '€1,99',
     color: '#6c3483',
     description: 'Ruoli oscuri che ribaltano ogni certezza',
-    roles: ['strega', 'figlio_dei_lupi', 'cacciatore', 'medium'],
+    roles: ['strega', 'figlio_dei_lupi', 'cacciatore', 'medium', 'indemoniato'],
   },
   villaggio: {
     id: 'villaggio',
@@ -1456,6 +1510,10 @@ function PaywallModal({ packId, onClose, onPurchase, isPurchasing }) {
   const [expandedRole, setExpandedRole] = useState(null);
   const [isTrying, setIsTrying] = useState(false);
   const [triedOnce, setTriedOnce] = useState(false);
+
+  useEffect(() => {
+    if (packId) trackEvent('paywall_view', { pack_id: packId });
+  }, [packId]);
 
   if (!packId) return null;
   const pack = PACKS[packId];
@@ -2312,6 +2370,7 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
   } = usePurchases(userId);
   // Narratore gioca?
   const [narratorPlays, setNarratorPlays] = useState(() => !!initialSetup?.narratorName);
+  const [publicVote, setPublicVote] = useState(() => initialSetup?.publicVote ?? true); // voto diurno palese (default: come al tavolo)
   const [narratorName, setNarratorName] = useState(() => initialSetup?.narratorName || '');
 
   const validPlayers = players.filter(n => n.trim().length > 0);
@@ -2430,6 +2489,30 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
                     className="w-full input-dark rounded-xl px-4 py-3 text-sm"/>
                 </div>
               )}
+            </div>
+
+            {/* Toggle: voto palese o segreto */}
+            <div className="rounded-2xl px-4 py-4 mb-5"
+                 style={{background:'rgba(226,201,126,0.05)', border:`1px solid ${publicVote ? 'rgba(226,201,126,0.3)' : 'rgba(255,255,255,0.07)'}`}}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🗳️</span>
+                  <div>
+                    <p className="text-white text-sm font-semibold">{t('createGame.publicVote')}</p>
+                    <p className="text-gray-600 text-xs">
+                      {publicVote ? t('createGame.publicVoteOn') : t('createGame.publicVoteOff')}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setPublicVote(v => !v)}
+                  className="relative w-12 h-6 rounded-full transition-all flex-shrink-0"
+                  style={{background: publicVote ? 'rgba(226,201,126,0.5)' : 'rgba(255,255,255,0.1)',
+                          border: `1px solid ${publicVote ? 'rgba(226,201,126,0.6)' : 'rgba(255,255,255,0.15)'}`}}>
+                  <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                       style={{left: publicVote ? 'calc(100% - 22px)' : '2px',
+                               boxShadow:'0 1px 4px rgba(0,0,0,0.4)'}} />
+                </button>
+              </div>
             </div>
 
             {/* Counter — include il narratore se attivo */}
@@ -2844,7 +2927,7 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
               }));
               const shuffledRoles = shuffleArray(finalRoles);
               const withRoles = vp.map((p, i) => ({...p, role: shuffledRoles[i], alive: true, ready: false}));
-              onStart(withRoles, uid(6), narratorActive ? narratorName.trim() : null);
+              onStart(withRoles, uid(6), narratorActive ? narratorName.trim() : null, publicVote);
             }}
             disabled={!rolesOk}
             className="btn-gold w-full py-4 rounded-2xl text-base">
@@ -2904,6 +2987,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const [showMyCard, setShowMyCard] = useState(false); // narratore vede la sua scheda personaggio
   const [narratorLocalVote, setNarratorLocalVote] = useState(null); // voto locale del narratore-giocatore
   const eventLogRef = useRef([]); // log eventi per il recap finale (ref = no stale closure)
+  const [frozenNightSteps, setFrozenNightSteps] = useState(null); // sequenza notte congelata (vedi buildNightSteps)
+  // pStates aggiornato leggibile dentro i setTimeout, dove la closure catturerebbe un valore stantio
+  const pStatesRef = useRef(pStates);
+  useEffect(() => { pStatesRef.current = pStates; }, [pStates]);
 
   const { purchasedPacks, purchasePackage, isLoading: isPurchasing } = usePurchases(userId);
   const [paywallPack, setPaywallPack] = useState(null);
@@ -3117,6 +3204,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
   const goFirstNight = ()=>{
     setNightStep(0);
+    setFrozenNightSteps(buildNightSteps(pStates, 1));
     setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null, { currentNightStep: null, nightVotes: null, dayVotes: null, nightDecisions: null }, 'night_open');
     setDayNum(1);
     window.playSfx('night');
@@ -3125,6 +3213,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const goNight = () => {
     setNightStep(0);
     setNightDecisions({});
+    setFrozenNightSteps(buildNightSteps(pStatesRef.current, dayNum));
     setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null, { currentNightStep: null, nightVotes: null, dayVotes: null }, 'night_open');
     window.playSfx('night');
   };
@@ -3164,10 +3253,19 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         }
       }
 
-      // Mitomane: registra il bersaglio (prima notte)
+      // Mitomane: eredita SUBITO il ruolo (e la squadra) del giocatore imitato.
+      // Il ruolo copiato appartiene per forza a un giocatore vivo, quindi il suo step
+      // è già dentro la sequenza congelata di stanotte: il Mitomane agisce da subito.
       if (step.key === 'mitomane' && target && !mitomaneTarget) {
         setMitomaneTarget(target);
         if(db && gameId) db.ref(`games/${gameId}/mitomaneTarget`).set(target);
+
+        const copiedRole = pStates[target]?.role;
+        const mitomaneId = Object.keys(pStates).find(id => pStates[id]?.alive && pStates[id]?.role === 'mitomane');
+        if (copiedRole && copiedRole !== 'mitomane' && mitomaneId) {
+          setPStates(prev => ({ ...prev, [mitomaneId]: { ...prev[mitomaneId], role: copiedRole } }));
+          if(db && gameId) db.ref(`games/${gameId}/players/${mitomaneId}/role`).set(copiedRole);
+        }
       }
     }
     setNightDecisions(newDecisions);
@@ -3360,8 +3458,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
          if(count > maxVotes) { maxVotes = count; target = tId; }
       });
       
+      // Snapshot dei voti per il recap: chi ha votato chi, e quanti voti ha preso ciascuno
+      const voteDetail = Object.entries(dayVotes).map(([voterId, tId]) => ({ voterId, targetId: tId }));
+
       if(target && pStates[target]) {
-         pushEvent({ type: 'day', turn: dayNum, dayVictim: target, noMajority: false });
+         pushEvent({ type: 'day', turn: dayNum, dayVictim: target, noMajority: false, votes: voteDetail, tally });
          const w = eliminate(target);
          if(w) return;
          // Frase statica → MP3 pre-registrato, nessuna API call
@@ -3372,19 +3473,23 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
          );
          setTimeout(() => {
            setNightStep(0); setNightDecisions({});
+           // pStatesRef, non pStates: qui la closure è vecchia di 10s e non vedrebbe l'eliminazione appena avvenuta
+           setFrozenNightSteps(buildNightSteps(pStatesRef.current, dayNum));
            setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null,
              { currentNightStep: null, nightVotes: null, dayVictimId: null }, 'night_open'
            );
            window.playSfx('night');
          }, 10000);
       } else {
-         pushEvent({ type: 'day', turn: dayNum, dayVictim: null, noMajority: true });
+         pushEvent({ type: 'day', turn: dayNum, dayVictim: null, noMajority: true, votes: voteDetail, tally });
          setNarrationAndPhase('ended_voting',
            t('narration.dayNoMajority'),
            null, { dayVotes: null, dayVictimId: null }, 'day_no_majority'
          );
          setTimeout(() => {
            setNightStep(0); setNightDecisions({});
+           // pStatesRef, non pStates: qui la closure è vecchia di 10s e non vedrebbe l'eliminazione appena avvenuta
+           setFrozenNightSteps(buildNightSteps(pStatesRef.current, dayNum));
            setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null,
              { currentNightStep: null, nightVotes: null, dayVictimId: null }, 'night_open'
            );
@@ -3414,7 +3519,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
   // Solo giocatori VIVI: evita che step di ruoli morti rimangano attivi
   const presentRoleIds = new Set(Object.values(pStates).filter(p=>p.alive).map(p=>p.role));
-  const activeNightSteps = NIGHT_STEPS.filter(s => (!s.hasRole || presentRoleIds.has(s.roleId)) && (!s.firstNightOnly || dayNum === 1));
+  // Durante la notte usa la sequenza congelata all'inizio della notte stessa: ricalcolarla
+  // a ogni render manderebbe fuori sync nightStep (che è un indice) appena un ruolo cambia.
+  const activeNightSteps = (phase === 'night' && frozenNightSteps)
+    ? frozenNightSteps
+    : buildNightSteps(pStates, dayNum);
 
   // ===================== AUTOMATED ENGINE =====================
   const engineTimer = useRef(null);
@@ -3448,8 +3557,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
           const aliveOfRole = Object.values(pStates).filter(p => p.alive && p.role === step.roleId);
           if (aliveOfRole.length === 0) {
             plannedAction = 'processNightStep'; delay = 7000;
-          } else if (step.roleId === 'figlio_dei_lupi') {
-            // Figlio dei Lupi non ha azione notturna: avanza automaticamente dopo il delay narrativo
+          } else if (step.roleId === 'figlio_dei_lupi' || step.roleId === 'indemoniato') {
+            // Nessuna azione notturna (osservano soltanto): avanza dopo il delay narrativo
             plannedAction = 'processNightStep'; delay = 7000;
           } else {
             const votersOfRole = Object.keys(nightVotes).filter(vid => pStates[vid]?.role === step.roleId);
@@ -4345,17 +4454,29 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         const narratorP = Object.values(pStates).find(p => p.isNarrator);
         if (!narratorP || phase === 'waiting') return null;
         const myRole = ROLES[narratorP.role];
+        // Il narratore-giocatore vota da dentro la sua scheda: senza un richiamo esplicito
+        // sul FAB sembra che non possa votare affatto.
+        const needsDayVote   = narratorP.alive && phase === 'voting'
+                               && !narratorLocalVote && !dayVotes[narratorP.id];
+        const needsNightVote = narratorP.alive && phase === 'night'
+                               && activeNightSteps[nightStep]?.roleId === narratorP.role
+                               && !narratorLocalVote && !nightVotes[narratorP.id];
+        const needsAction = needsDayVote || needsNightVote;
+        const fabColor = needsAction ? '#ef4444' : (myRole?.color || '#e2c97e');
         return (
           <>
             {/* FAB fisso bottom-right */}
             <button
               onClick={() => setShowMyCard(true)}
-              className="fixed bottom-24 right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full transition-all active:scale-95 shadow-lg"
-              style={{background:'rgba(13,17,23,0.95)', border:`1px solid ${myRole?.color || '#e2c97e'}55`,
-                      boxShadow:`0 0 16px ${myRole?.color || '#e2c97e'}22`}}>
-              <span className="text-lg leading-none">{myRole?.icon || '🎭'}</span>
-              <span className="text-xs font-bold" style={{color: myRole?.color || '#e2c97e'}}>
-                {t('gameMaster.myRoleFab')}
+              className={`fixed bottom-24 right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full transition-all active:scale-95 shadow-lg ${needsAction ? 'anim-pulse' : ''}`}
+              style={{background: needsAction ? 'rgba(239,68,68,0.22)' : 'rgba(13,17,23,0.95)',
+                      border:`1px solid ${fabColor}${needsAction ? 'cc' : '55'}`,
+                      boxShadow:`0 0 ${needsAction ? '26px' : '16px'} ${fabColor}${needsAction ? '77' : '22'}`}}>
+              <span className="text-lg leading-none">{needsAction ? '🗳️' : (myRole?.icon || '🎭')}</span>
+              <span className="text-xs font-bold" style={{color: needsAction ? '#fff' : fabColor}}>
+                {needsDayVote ? t('gameMaster.fabVoteNow')
+                  : needsNightVote ? t('gameMaster.fabYourTurn')
+                  : t('gameMaster.myRoleFab')}
               </span>
             </button>
 
@@ -4560,6 +4681,7 @@ function PlayerScreen({gameId, playerId}) {
   const [localVote, setLocalVote] = useState(null);
   const [debugLog, setDebugLog] = useState('');
   const [error, setError] = useState(null);
+  const [deviceConflict, setDeviceConflict] = useState(false); // token QR di un altro dispositivo
   const [showRoleInfo, setShowRoleInfo] = useState(false);
   const [showRolesInGame, setShowRolesInGame] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -4582,12 +4704,7 @@ function PlayerScreen({gameId, playerId}) {
       return;
     }
 
-    // Genera token dispositivo se non esiste
-    let deviceToken = localStorage.getItem('lif_device_token');
-    if(!deviceToken) {
-      deviceToken = Math.random().toString(36).substring(2);
-      localStorage.setItem('lif_device_token', deviceToken);
-    }
+    const deviceToken = getDeviceToken();
 
     const ref = db.ref(`games/${gameId}`);
     ref.on('value', snap=>{
@@ -4601,10 +4718,11 @@ function PlayerScreen({gameId, playerId}) {
           db.ref(`games/${gameId}/players/${playerId}/deviceToken`).set(deviceToken);
         } else if (playerInfo.deviceToken !== deviceToken) {
           setError(t('player.deviceStolenWarning'));
+          setDeviceConflict(true); // sblocca il pulsante "continua qui" invece di lasciare un vicolo cieco
           return;
         }
       }
-      
+
       setGameData(data);
     });
     return ()=>ref.off();
@@ -4685,6 +4803,24 @@ function PlayerScreen({gameId, playerId}) {
       <Moon size={56}/>
       <p className="font-cinzel text-moon text-xl mt-4 mb-2">{t('player.error')}</p>
       <p className="text-gray-500 text-sm">{error}</p>
+      {/* Conflitto di dispositivo: quasi sempre è lo stesso giocatore che passa
+          da Safari all'app nativa (localStorage separati). Deve poter proseguire. */}
+      {deviceConflict && (
+        <>
+          <button
+            onClick={() => {
+              if (db && gameId && playerId) {
+                db.ref(`games/${gameId}/players/${playerId}/deviceToken`).set(getDeviceToken());
+              }
+              setDeviceConflict(false);
+              setError(null); // il listener Firebase è ancora attivo e ricaricherà la partita
+            }}
+            className="btn-gold mt-6 px-6 py-3 rounded-2xl text-sm">
+            {t('player.takeOverDevice')}
+          </button>
+          <p className="text-gray-600 text-xs mt-3 max-w-xs">{t('player.takeOverHint')}</p>
+        </>
+      )}
     </div>
   );
 
@@ -4709,7 +4845,10 @@ function PlayerScreen({gameId, playerId}) {
 
   // Mostra banner "Apri nell'App" solo su browser mobile (non in-app nativa)
   const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
-  const deepLinkUrl = `lupus://join?game=${gameId}&player=${playerId}`;
+  // Il token viaggia nel deep link: Safari e la WebView nativa hanno localStorage separati,
+  // quindi senza passarlo l'app genererebbe un token nuovo e la guardia anti-furto
+  // bloccherebbe il giocatore sul suo stesso telefono.
+  const deepLinkUrl = `lupus://join?game=${gameId}&player=${playerId}&dt=${encodeURIComponent(getDeviceToken())}`;
 
   return (
     <div className={`min-h-screen layer screen-safe px-4 pb-44 ${(phase === 'role_reveal' || phase === 'waiting') ? 'pt-3' : 'py-6'} ${phaseDisplay.bg}`} style={{ pointerEvents: 'auto' }}>
@@ -4776,6 +4915,7 @@ function PlayerScreen({gameId, playerId}) {
           <RoleCard
             role={player.role} playerName={player.name}
             flipped={flipped} onFlip={()=>{ window.haptic('heavy'); setFlipped(true); }}
+            onHide={()=>{ window.haptic('light'); setFlipped(false); }}
             userPhoto={user?.photoURL}
           />
         </div>
@@ -4914,6 +5054,38 @@ function PlayerScreen({gameId, playerId}) {
           <p className="text-gray-600 text-[10px] mb-3">{t('player.tapToReviewRole')}</p>
           </>
           )}
+
+          {/* ── ALLEATI: i lupi si riconoscono fra loro; l'Indemoniato conosce i lupi ── */}
+          {player.alive && (() => {
+            const iAmWolf    = ROLES[player.role]?.team === 'lupi';
+            const iKnowWolves = !!ROLES[player.role]?.knowsWolves;
+            if (!iAmWolf && !iKnowWolves) return null;
+            // Ricalcolata dal vivo a ogni render: così il Figlio dei Lupi compare
+            // nel branco appena si trasforma, e i lupi morti restano visibili barrati.
+            const wolves = Object.entries(gameData.players || {})
+              .filter(([, p]) => ROLES[p.role]?.team === 'lupi');
+            if (!wolves.length) return null;
+            return (
+              <div className="w-full mt-1 mb-3 p-3 rounded-2xl text-left anim-fade-in"
+                   style={{background:'rgba(192,57,43,0.12)', border:'1px solid rgba(192,57,43,0.4)'}}>
+                <p className="text-[10px] uppercase tracking-widest mb-2" style={{color:'#ef8a80'}}>
+                  🐺 {iAmWolf ? t('player.yourPack') : t('player.wolvesYouKnow')}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {wolves.map(([wid, w]) => (
+                    <span key={wid} className="text-xs font-bold px-2.5 py-1 rounded-full"
+                          style={{background: w.alive ? 'rgba(192,57,43,0.28)' : 'rgba(255,255,255,0.05)',
+                                  border:'1px solid rgba(192,57,43,0.45)',
+                                  color: w.alive ? '#fff' : 'rgba(255,255,255,0.38)',
+                                  textDecoration: w.alive ? 'none' : 'line-through'}}>
+                      {w.name}{wid === playerId ? ` (${t('player.you')})` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* NIGHT VOTING UI */}
           {player.alive && phase==='night' && gameData.currentNightStep?.roleId === player.role && (
             <div className="mt-6 p-4 rounded-2xl anim-fade-up text-left" style={{background:role?.color+'1a', border:`1px solid ${role?.color}44`}}>
@@ -4924,6 +5096,13 @@ function PlayerScreen({gameId, playerId}) {
                 <div className="text-center py-4 mt-2">
                   <p className="text-3xl mb-2">🐺</p>
                   <p className="text-gray-300 text-sm leading-relaxed">{t('player.wolfChildStayStill')}<br/>{t('player.wolfChildObserve')}</p>
+                  <p className="text-gray-600 text-xs mt-3">{t('player.shamanWaitingAdvance')}</p>
+                </div>
+              ) : /* ── INDEMONIATO: nessuna azione, osserva il branco (lista qui sopra) ── */
+              player.role === 'indemoniato' ? (
+                <div className="text-center py-4 mt-2">
+                  <p className="text-3xl mb-2">😈</p>
+                  <p className="text-gray-300 text-sm leading-relaxed">{t('player.minionObserve')}</p>
                   <p className="text-gray-600 text-xs mt-3">{t('player.shamanWaitingAdvance')}</p>
                 </div>
               ) : /* ── STREGA: scelta pozioni ── */
@@ -5200,17 +5379,29 @@ function PlayerScreen({gameId, playerId}) {
           )}
 
           {/* DAY VOTING UI */}
-          {player.alive && phase==='voting' && (
+          {player.alive && phase==='voting' && (() => {
+            // publicVote assente = partite create prima di questa opzione → palese (com'era al tavolo)
+            const isPublic = gameData.publicVote !== false;
+            const castVotes = gameData.dayVotes || {};
+            // targetId → nomi di chi lo ha votato
+            const votersByTarget = {};
+            Object.entries(castVotes).forEach(([voterId, targetId]) => {
+              (votersByTarget[targetId] ||= []).push(gameData.players?.[voterId]?.name || '?');
+            });
+            return (
             <div className="mt-6 p-4 rounded-2xl anim-fade-up text-left" style={{background:role?.color+'1a', border:`1px solid ${role?.color}44`}}>
               <p className="font-cinzel font-bold text-white mb-1"><span className="text-xl">🗳️</span> {t('player.dayVoteCondemn')}</p>
-              <p className="text-gray-400 text-xs mb-3">{t('player.dayVoteTap')}</p>
+              <p className="text-gray-400 text-xs mb-3">
+                {t('player.dayVoteTap')} · {isPublic ? t('player.voteModePublic') : t('player.voteModeSecret')}
+              </p>
               <div className="flex flex-col gap-3 relative z-50">
                 {Object.entries(gameData.players||{}).filter(([id, p])=>p.alive && id!==playerId).map(([id, p])=>{
-                  const isSelected = localVote === id || (gameData.dayVotes?.[playerId] === id);
+                  const isSelected = localVote === id || (castVotes[playerId] === id);
+                  const voters = isPublic ? (votersByTarget[id] || []) : [];
                   return (
-                    <button key={id} 
+                    <button key={id}
                       onClick={(e) => { e.stopPropagation(); castDayVote(id); }}
-                      className={`w-full p-5 rounded-2xl flex justify-between items-center transition-all cursor-pointer active:brightness-150 touch-manipulation shadow-lg ${isSelected ? 'bg-white/40 scale-[1.02]' : 'bg-white/10'}`}
+                      className={`w-full p-5 rounded-2xl flex justify-between items-center gap-3 transition-all cursor-pointer active:brightness-150 touch-manipulation shadow-lg ${isSelected ? 'bg-white/40 scale-[1.02]' : 'bg-white/10'}`}
                       style={{
                         border: isSelected ? `4px solid #ef4444` : '3px solid rgba(255,255,255,0.2)',
                         boxShadow: isSelected ? '0 0 35px rgba(239,68,68,0.7)' : 'none',
@@ -5218,14 +5409,40 @@ function PlayerScreen({gameId, playerId}) {
                         position: 'relative',
                         zIndex: 999
                       }}>
-                      <span className="font-bold text-white text-2xl pr-4 pointer-events-none">{p.name}</span>
-                      {isSelected ? <span className="text-4xl pointer-events-none">🔥</span> : <div className="w-10 h-10 rounded-full border-2 border-white/40 pointer-events-none"></div>}
+                      <div className="flex-1 min-w-0 text-left pointer-events-none">
+                        <span className="font-bold text-white text-2xl">{p.name}</span>
+                        {voters.length > 0 && (
+                          <p className="text-[11px] text-white/60 mt-1 leading-tight break-words">{voters.join(', ')}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 pointer-events-none">
+                        {voters.length > 0 && (
+                          <span className="text-sm font-bold px-2.5 py-1 rounded-full"
+                                style={{background:'rgba(239,68,68,0.3)', border:'1px solid rgba(239,68,68,0.65)', color:'#fff'}}>
+                            {voters.length}
+                          </span>
+                        )}
+                        {isSelected ? <span className="text-4xl">🔥</span> : <div className="w-10 h-10 rounded-full border-2 border-white/40"></div>}
+                      </div>
                     </button>
                   );
                 })}
               </div>
+              {/* Chi non ha ancora votato — solo in modalità palese */}
+              {isPublic && (() => {
+                const missing = Object.entries(gameData.players||{})
+                  .filter(([id, p]) => p.alive && !castVotes[id])
+                  .map(([, p]) => p.name);
+                if (!missing.length) return null;
+                return (
+                  <p className="text-gray-500 text-[11px] mt-3 leading-tight">
+                    ⏳ {t('player.stillToVote')}: {missing.join(', ')}
+                  </p>
+                );
+              })()}
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -5246,14 +5463,30 @@ function PlayerScreen({gameId, playerId}) {
                style={{background:role?.color+'1a', border:`1px solid ${role?.color}44`}}>
             <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">{t('player.yourRole')}</p>
             <p className="font-cinzel text-white text-xl mb-1">{role?.icon} {role?.name}</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs px-2 py-0.5 rounded-full" style={{background:role?.color+'22',border:`1px solid ${role?.color}44`,color:role?.color}}>
                 {role?.team==='lupi'?t('teamBadge.lupi'):t('teamBadge.villaggio')}
               </span>
+              {/* Indemoniato: sta col villaggio nei numeri, ma esulta col branco */}
+              {role?.winsWith === 'lupi' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                      style={{background:'rgba(220,38,38,0.18)', border:'1px solid rgba(220,38,38,0.45)', color:'#f87171'}}>
+                  {t('player.winsWithWolves')}
+                </span>
+              )}
               <span className={`text-xs font-bold ${player?.alive?'text-green-400':'text-red-400'}`}>
                 {player?.alive ? t('player.survived') : t('player.eliminated')}
               </span>
             </div>
+            {(() => {
+              const myWinTeam = role?.winsWith || role?.team;
+              const iWon = gameData.winner === myWinTeam;
+              return (
+                <p className={`mt-3 font-cinzel font-bold text-lg ${iWon ? 'text-green-400' : 'text-red-400'}`}>
+                  {iWon ? t('player.youWon') : t('player.youLost')}
+                </p>
+              );
+            })()}
           </div>
 
           {/* ── Tutti i ruoli rivelati ── */}
@@ -5363,6 +5596,24 @@ function PlayerScreen({gameId, playerId}) {
                             ? <p className="text-gray-300 text-sm">{t('player.dayNoAgreement')}</p>
                             : <p className="text-gray-300 text-sm">{t('player.dayCondemnedLog', {target: `${pName(ev.dayVictim)} (${pRole(ev.dayVictim)})`})}</p>
                           }
+                          {/* Dettaglio del voto: chi ha votato chi, raggruppato per bersaglio */}
+                          {ev.votes?.length > 0 && (() => {
+                            const byTarget = {};
+                            ev.votes.forEach(v => { (byTarget[v.targetId] ||= []).push(pName(v.voterId)); });
+                            return (
+                              <div className="mt-2 pl-3" style={{borderLeft:'2px solid rgba(255,255,255,0.1)'}}>
+                                {Object.entries(byTarget)
+                                  .sort((a, b) => b[1].length - a[1].length)
+                                  .map(([tid, voters]) => (
+                                    <p key={tid} className="text-gray-500 text-xs leading-snug">
+                                      <span className="text-gray-400 font-bold">{pName(tid)}</span>
+                                      {' '}←{' '}{voters.join(', ')}
+                                      <span className="text-gray-600"> ({voters.length})</span>
+                                    </p>
+                                  ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     }
@@ -5716,7 +5967,13 @@ function App() {
       }
     } catch(e) { localStorage.removeItem('lif_rejoin'); }
 
-    // 2) Native app: gestisci deep link lupus://join?game=XXX&player=YYY
+    // 2) Native app: gestisci deep link lupus://join?game=XXX&player=YYY&dt=TOKEN
+    // Il parametro dt trasporta il token dispositivo dalla pagina web: senza, l'app
+    // ne genererebbe uno nuovo (localStorage separato) e verrebbe scambiata per un ladro di QR.
+    const adoptDeviceToken = (url) => {
+      const dt = url.searchParams.get('dt');
+      if (dt) { try { localStorage.setItem('lif_device_token', dt); } catch {} }
+    };
     const setupDeepLink = async () => {
       try {
         const { App: CapApp } = await import('@capacitor/app');
@@ -5724,9 +5981,8 @@ function App() {
         CapApp.addListener('appUrlOpen', (event) => {
           try {
             const url = new URL(event.url);
-            const dg = url.searchParams.get('game');
-            const dp = url.searchParams.get('player');
-            openPlayerScreen(dg, dp);
+            adoptDeviceToken(url);
+            openPlayerScreen(url.searchParams.get('game'), url.searchParams.get('player'));
           } catch(e) { console.warn('Deep link parse error:', e); }
         });
         // App appena aperta tramite deep link (cold start)
@@ -5734,9 +5990,8 @@ function App() {
         if (launchUrl?.url) {
           try {
             const url = new URL(launchUrl.url);
-            const dg = url.searchParams.get('game');
-            const dp = url.searchParams.get('player');
-            openPlayerScreen(dg, dp);
+            adoptDeviceToken(url);
+            openPlayerScreen(url.searchParams.get('game'), url.searchParams.get('player'));
           } catch(e) {}
         }
       } catch(e) {
@@ -5746,11 +6001,11 @@ function App() {
     setupDeepLink();
   },[openPlayerScreen]);
 
-  const handleCreateGame = (withRoles, gid) => {
+  const handleCreateGame = (withRoles, gid, _narratorName, publicVote = true) => {
     // Save to Firebase
     if(db){
       const fbPlayers = withRoles.reduce((acc,p)=>({...acc,[p.id]:{name:p.name,role:p.role,alive:true,ready:false}}),{});
-      db.ref(`games/${gid}`).set({ id:gid, phase:'waiting', createdAt:Date.now(), players:fbPlayers });
+      db.ref(`games/${gid}`).set({ id:gid, phase:'waiting', createdAt:Date.now(), players:fbPlayers, publicVote });
     }
     setPlayers(withRoles);
     setGameId(gid);

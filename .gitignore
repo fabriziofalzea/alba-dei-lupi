@@ -19,3 +19,5 @@ extract.py
 setup-capacitor.sh
 deploy.sh
 scratch/
+releases/
+screenshots_en/
