@@ -2422,9 +2422,15 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
 
   const handleBack = () => { if (step === 1) onBack(); else setStep(s => s - 1); };
 
-  // Consigli lupi
+  // Consigli bilanciamento.
+  // Contano tutte le forze del male, non solo i lupi: l'Indemoniato non uccide e nel
+  // calcolo vittoria vale come villico (quindi i lupi devono comunque uccidere lo stesso
+  // numero di persone), ma toglie al villaggio un alleato vero e passa informazioni al
+  // branco. A parità di numeri il villaggio è più debole, e il consiglio deve dirlo.
+  const traitorCount = roles.filter(rid => ROLES[rid]?.winsWith === 'lupi').length;
+  const evilTotal = wolfCount + traitorCount;
   const recommended = rolesNeeded <= 5 ? 1 : rolesNeeded <= 8 ? 2 : rolesNeeded <= 11 ? 3 : 4;
-  const wolfDiff = wolfCount - recommended;
+  const wolfDiff = evilTotal - recommended;
   const wolfAdvice = wolfDiff === 0
     ? { text: t('createGame.recommendedPerfect', {n: rolesNeeded}), color: '#4ade80' }
     : wolfDiff === 1 ? { text: t('createGame.recommendedHarder'), color: '#fbbf24' }
@@ -2908,6 +2914,14 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
       {step === 3 && (
         <div className="fixed bottom-0 left-0 right-0 px-4 pt-3 pb-6"
              style={{background:'linear-gradient(to top, rgba(13,17,23,1) 75%, transparent)'}}>
+          {/* Composizione delle forze del male — appare solo se ci sono traditori in gioco */}
+          {traitorCount > 0 && (
+            <p className="text-[11px] text-center mb-2 px-1 leading-snug"
+               style={{color: evilTotal > recommended ? '#f87171' : '#9ca3af'}}>
+              🐺 {wolfCount} + 😈 {traitorCount} = <strong>{evilTotal}</strong> {t('createGame.evilForces')}
+              {evilTotal > recommended && ` · ${t('createGame.evilTooMany', {n: recommended})}`}
+            </p>
+          )}
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-gray-600 text-xs">🐺 ×{wolfCount} · {wolfCount + roles.length}/{rolesNeeded}</span>
             <span className={`text-xs font-bold ${spotsLeft === 0 ? 'text-green-400' : 'text-gray-500'}`}>

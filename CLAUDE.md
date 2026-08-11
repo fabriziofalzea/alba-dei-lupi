@@ -195,6 +195,7 @@ Traditore nel villaggio. `team: 'villaggio'` (conta come villico nel calcolo vit
 - **Nascondi ruolo**: pulsante 🙈 sulla carta girata (`RoleCard` prop `onHide`)
 - **Narratore vota**: il voto c'era già ma era sepolto dietro il FAB "Il mio ruolo" — ora il FAB diventa rosso e pulsa
 - **Log partita**: gli eventi `day` registrano anche `votes` e `tally`, il recap mostra chi ha votato chi
+- **Bilanciamento**: il consigliere contava solo `wolfCount`, quindi con l'Indemoniato dichiarava "bilanciamento perfetto" mentre il villaggio era in svantaggio. Ora conta le **forze del male totali** (`wolfCount` + ruoli con `winsWith: 'lupi'`) contro lo stesso `recommended`, e al passo 3 mostra la composizione (`🐺 2 + 😈 1 = 3`). ⚠️ La soglia `recommended` **non è stata ritarata**: l'assunzione è che un Indemoniato pesi quanto un lupo. Da rivedere dopo qualche partita reale — l'Indemoniato non uccide, ma nel calcolo vittoria vale come villico, quindi non cambia il numero di morti necessari ai lupi e regala loro un informatore
 
 ### Bug risolti (non erano in lista)
 1. **Sequenza notturna in desync** — `nightStep` è un indice in un array ricalcolato a ogni render da `presentRoleIds`. Qualunque cambio di ruolo a notte in corso (Mitomane, Strega che avvelena) riordinava l'array facendo saltare o ripetere uno step. Ora `buildNightSteps()` la congela a inizio notte, in **tutti e 4** i punti d'ingresso alla fase notte. `pStatesRef` serve a leggere lo stato aggiornato dentro i `setTimeout` (la closure è vecchia di 10s e non vedrebbe l'eliminazione appena avvenuta).
