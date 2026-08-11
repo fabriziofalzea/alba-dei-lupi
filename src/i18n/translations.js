@@ -46,8 +46,8 @@ export const IT = {
     },
     cupido: {
       name: 'Cupido',
-      description: 'La prima notte scegli due innamorati. Se uno muore, l\'altro muore di dolore. Se sono un lupo e un villico, vincono solo se sono gli ultimi due sopravvissuti.',
-      tip: 'Unire due lupi o due ruoli chiave del villaggio può essere devastante.',
+      description: 'Ogni notte leghi due giocatori. I legami si accumulano per tutta la partita: quando uno muore, muoiono di dolore tutti quelli legati a lui, anche a catena. Ogni innamorato continua a vincere con la propria squadra.',
+      tip: 'Legare sempre le stesse persone crea una catena che può svuotare il tavolo con una sola morte: usala quando serve, non per abitudine.',
     },
     sindaco: {
       name: 'Sindaco',
@@ -299,6 +299,10 @@ export const IT = {
     publicVote: 'Voto palese',
     publicVoteOn: 'Tutti vedono chi vota chi',
     publicVoteOff: 'Voti segreti fino al verdetto',
+    voteInfoSecretTitle: 'Voto segreto',
+    voteInfoSecretBody: 'durante la votazione nessuno sa chi ha votato chi: si vede solo quanti hanno già votato. Il condannato viene annunciato alla fine. Più teso, e i lupi non possono coordinarsi guardando i voti.',
+    voteInfoPublicTitle: 'Voto palese',
+    voteInfoPublicBody: 'ogni giocatore vede in tempo reale i nomi di chi ha votato chi, quanti voti ha preso ciascuno e chi non ha ancora votato. Come alzare la mano al tavolo: più discussione, ma niente sorprese.',
     yourNamePlaceholder: 'Il tuo nome…',
     narratorBadge: 'Narratore',
     addAtLeast4: 'Aggiungi almeno 4 giocatori',
@@ -635,8 +639,8 @@ export const EN = {
     },
     cupido: {
       name: 'Cupid',
-      description: 'On the first night you choose two lovers. If one dies, the other dies of grief. If they\'re a werewolf and a villager, they only win if they\'re the last two survivors.',
-      tip: 'Pairing two werewolves, or two key village roles, can be devastating.',
+      description: 'Every night you bind two players. The bonds pile up over the whole game: when one dies, everyone bound to them dies of grief too, in a chain. Each lover still wins with their own team.',
+      tip: 'Always binding the same people builds a chain that can empty the table with a single death: use it when it counts, not out of habit.',
     },
     sindaco: {
       name: 'Mayor',
@@ -888,6 +892,10 @@ export const EN = {
     publicVote: 'Open vote',
     publicVoteOn: 'Everyone sees who votes for whom',
     publicVoteOff: 'Votes hidden until the verdict',
+    voteInfoSecretTitle: 'Secret vote',
+    voteInfoSecretBody: 'during the vote nobody knows who voted for whom: you only see how many have voted. The condemned is announced at the end. More tense, and the werewolves cannot coordinate by watching the votes.',
+    voteInfoPublicTitle: 'Open vote',
+    voteInfoPublicBody: 'every player sees in real time who voted for whom, how many votes each received and who has not voted yet. Like raising hands at the table: more discussion, but no surprises.',
     yourNamePlaceholder: 'Your name…',
     narratorBadge: 'Narrator',
     addAtLeast4: 'Add at least 4 players',

@@ -429,7 +429,7 @@ const ROLES = {
     id:'cupido', name:'Cupido', team:'villaggio', color:'#e91e63', icon:'💘',
     abbr:'Cu', pack:'villaggio',
     category:'speciale', wakeOrder:0, nightAction:true,
-    description:'La prima notte scegli due innamorati. Se uno muore, l\'altro muore di dolore. Se sono un lupo e un villico, vincono solo se sono gli ultimi due sopravvissuti.',
+    description:'Ogni notte leghi due giocatori. I legami si accumulano per tutta la partita: quando uno muore, muoiono di dolore tutti quelli legati a lui, anche a catena. Ogni innamorato continua a vincere con la propria squadra.',
     tip:'Unire due lupi o due ruoli chiave del villaggio può essere devastante.'
   },
   sindaco: {
@@ -523,7 +523,7 @@ const NIGHT_NARRATION = {
 
 const NIGHT_STEPS = [
   { key:'open',     label:'Apertura',     icon:'🌙', hasRole:false },
-  { key:'cupido',   label:'Cupido',       icon:'💘', hasRole:true,  roleId:'cupido',   firstNightOnly:true },
+  { key:'cupido',   label:'Cupido',       icon:'💘', hasRole:true,  roleId:'cupido' },
   { key:'mitomane', label:'Mitomane',     icon:'🎭', hasRole:true,  roleId:'mitomane', firstNightOnly:true },
   { key:'veggente', label:'Veggente',     icon:'🔮', hasRole:true,  roleId:'veggente' },
   { key:'guardia',         label:'Guardia',         icon:'🛡️', hasRole:true,  roleId:'guardia' },
@@ -2375,7 +2375,8 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
   } = usePurchases(userId);
   // Narratore gioca?
   const [narratorPlays, setNarratorPlays] = useState(() => !!initialSetup?.narratorName);
-  const [publicVote, setPublicVote] = useState(() => initialSetup?.publicVote ?? true); // voto diurno palese (default: come al tavolo)
+  const [publicVote, setPublicVote] = useState(() => initialSetup?.publicVote ?? false); // voto diurno palese (default: segreto)
+  const [voteInfoOpen, setVoteInfoOpen] = useState(false);
   const [narratorName, setNarratorName] = useState(() => initialSetup?.narratorName || '');
 
   const validPlayers = players.filter(n => n.trim().length > 0);
@@ -2517,7 +2518,14 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🗳️</span>
                   <div>
-                    <p className="text-white text-sm font-semibold">{t('createGame.publicVote')}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-white text-sm font-semibold">{t('createGame.publicVote')}</p>
+                      <button onClick={() => setVoteInfoOpen(v => !v)}
+                              className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold leading-none transition-all active:scale-90"
+                              style={{background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.25)', color:'rgba(255,255,255,0.7)'}}>
+                        i
+                      </button>
+                    </div>
                     <p className="text-gray-600 text-xs">
                       {publicVote ? t('createGame.publicVoteOn') : t('createGame.publicVoteOff')}
                     </p>
@@ -2532,6 +2540,17 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
                                boxShadow:'0 1px 4px rgba(0,0,0,0.4)'}} />
                 </button>
               </div>
+              {voteInfoOpen && (
+                <div className="mt-3 pt-3 text-xs leading-relaxed anim-fade-in"
+                     style={{borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                  <p className="text-gray-400 mb-2">
+                    <span className="text-white font-semibold">{t('createGame.voteInfoSecretTitle')}</span> — {t('createGame.voteInfoSecretBody')}
+                  </p>
+                  <p className="text-gray-400">
+                    <span className="text-white font-semibold">{t('createGame.voteInfoPublicTitle')}</span> — {t('createGame.voteInfoPublicBody')}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Counter — include il narratore se attivo */}
@@ -3116,7 +3135,26 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const [nightVotes, setNightVotes] = useState({});
   const [dayVotes, setDayVotes] = useState({});
   const [nightDecisions, setNightDecisions] = useState({});
-  const [lovers, setLovers] = useState({}); // { player1id: player2id, player2id: player1id }
+  // Cupido agisce ogni notte e i legami si sommano, quindi un giocatore può avere
+  // più partner: { playerId: [partnerIds] }. Le partite salvate col vecchio formato
+  // (un solo partner come stringa) restano leggibili grazie a loversOf().
+  const [lovers, setLovers] = useState({});
+  // Normalizza i due formati: stringa singola (partite vecchie) o array (nuovo)
+  const loversOf = useCallback((id) => {
+    const v = lovers?.[id];
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
+  }, [lovers]);
+  // Aggiunge un legame bidirezionale senza duplicati, preservando quelli esistenti
+  const linkLovers = useCallback((a, b, current) => {
+    const src = current || lovers || {};
+    const norm = id => { const v = src[id]; return !v ? [] : (Array.isArray(v) ? v : [v]); };
+    return {
+      ...src,
+      [a]: [...new Set([...norm(a), b])],
+      [b]: [...new Set([...norm(b), a])],
+    };
+  }, [lovers]);
   const [dawnInfo, setDawnInfo] = useState(null); // info GM sull'alba: { victimId, poisonVictimId, stregaHealed, figlioTransformed, mediumResult, sciamanoResult }
 
   // Firebase listener for ready count and night votes
@@ -3191,11 +3229,22 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
     if(db && gameId) db.ref(`games/${gameId}/players/${pid}/alive`).set(false);
     if(!silent) window.playSfx('dead');
 
-    // Cupido: se un innamorato muore, muore anche l'altro
-    const partnerId = lovers[pid];
-    if(partnerId && newStates[partnerId]?.alive) {
-      newStates = {...newStates, [partnerId]:{...newStates[partnerId], alive:false}};
-      if(db && gameId) db.ref(`games/${gameId}/players/${partnerId}/alive`).set(false);
+    // Cupido lega una coppia ogni notte e i legami si accumulano: il dolore si
+    // propaga a CATENA lungo tutto il grafo, non solo al partner diretto.
+    // Visita in ampiezza con insieme dei visitati: i legami possono formare cicli.
+    const queue = [pid];
+    const seen = new Set([pid]);
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const partnerId of loversOf(cur)) {
+        if (seen.has(partnerId)) continue;
+        seen.add(partnerId);
+        queue.push(partnerId);
+        if (newStates[partnerId]?.alive) {
+          newStates = {...newStates, [partnerId]:{...newStates[partnerId], alive:false}};
+          if(db && gameId) db.ref(`games/${gameId}/players/${partnerId}/alive`).set(false);
+        }
+      }
     }
 
     pStatesRef.current = newStates; // subito, così la prossima eliminazione dello stesso tick la vede
@@ -3277,18 +3326,28 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       });
       if(target) newDecisions[step.key] = target;
 
-      // Cupido: legge la doppia scelta "id1,id2" fatta dal telefono
+      // Il Mitomane si SOMMA al ruolo imitato: due Streghe hanno due set di pozioni,
+      // due Guardie proteggono due bersagli diversi. La decisione unica per ruolo qui
+      // sopra basta ai Lupi (che decidono in gruppo) ma perderebbe una delle due azioni
+      // individuali, quindi le conserviamo tutte indicizzate per giocatore.
+      const perPlayer = {};
+      Object.entries(nightVotes).forEach(([vid, tId]) => {
+        if(pStates[vid]?.role === step.roleId) perPlayer[vid] = tId;
+      });
+      newDecisions[step.key + 'ByPlayer'] = perPlayer;
+
+      // Cupido agisce OGNI notte e i legami si accumulano: la coppia nuova si
+      // aggiunge alle precedenti invece di sostituirle.
       if (step.key === 'cupido' && target) {
         if (target.includes(',')) {
-          // Nuovo sistema: cupido ha scelto entrambi dal telefono
           const [l1, l2] = target.split(',');
-          if (l1 && l2 && pStates[l1] && pStates[l2]) {
-            const newLovers = { [l1]: l2, [l2]: l1 };
+          if (l1 && l2 && pStates[l1] && pStates[l2] && l1 !== l2) {
+            const newLovers = linkLovers(l1, l2);
             setLovers(newLovers);
             fbUpdate({ lovers: newLovers });
           }
-        } else if (Object.keys(lovers).length === 0) {
-          // Fallback vecchio sistema: apre modal per secondo innamorato
+        } else {
+          // Fallback: solo il primo innamorato scelto, il narratore completa da modal
           setShowCupidoModal(target);
           setNightDecisions(newDecisions);
           return;
@@ -3329,7 +3388,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       // ── Dawn Reveal — calcolo vittime ──
       let dawnVictim = newDecisions['lupi'];
       if(dawnVictim && ROLES[pStates[dawnVictim]?.role]?.immuneToWolves) dawnVictim = null;
-      if(dawnVictim === newDecisions['guardia']) dawnVictim = null;
+      // Ogni Guardia protegge il proprio bersaglio: col Mitomane possono essercene due.
+      const guardiaTargets = Object.values(newDecisions['guardiaByPlayer'] || {});
+      if(guardiaTargets.length ? guardiaTargets.includes(dawnVictim)
+                               : dawnVictim === newDecisions['guardia']) dawnVictim = null;
 
       // Figlio dei Lupi: si trasforma invece di morire
       let figlioTransformed = false;
@@ -3347,13 +3409,19 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         figlioTransformed = true;
       }
 
-      // Strega
-      const stregaDecision = newDecisions['strega'];
-      const stregaUsedHeal   = stregaDecision === 'HEAL';
-      const stregaUsedPoison = stregaDecision && stregaDecision !== 'HEAL' && stregaDecision !== 'PASS';
+      // Streghe: ognuna ha le SUE pozioni (il Mitomane si somma, non le condivide),
+      // quindi nella stessa notte possono esserci più cure e più veleni.
+      const stregaByPlayer = Object.keys(newDecisions['stregaByPlayer'] || {}).length
+        ? newDecisions['stregaByPlayer']
+        : (newDecisions['strega'] ? { _single: newDecisions['strega'] } : {});
+      const stregaEntries = Object.entries(stregaByPlayer);
+      const healers   = stregaEntries.filter(([, d]) => d === 'HEAL').map(([vid]) => vid);
+      const poisoners = stregaEntries.filter(([, d]) => d && d !== 'HEAL' && d !== 'PASS');
+      const stregaUsedHeal   = healers.length > 0;
+      const stregaUsedPoison = poisoners.length > 0;
       if(stregaUsedHeal && dawnVictim) {
         dawnVictim = null;
-        fbUpdate({ witchHealUsed: true });
+        healers.forEach(vid => fbUpdate({ [`witchPotions/${vid}/heal`]: true }));
       }
 
       // Medium
@@ -3364,16 +3432,21 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         mediumResult = { name: pStates[mediumDecision].name, role: medRole };
       }
 
-      // Sciamano: resuscita
-      const sciamanoDecision = newDecisions['sciamano'];
+      // Sciamani: ognuno ha la propria resurrezione, per lo stesso motivo delle Streghe
+      const sciamanoByPlayer = Object.keys(newDecisions['sciamanoByPlayer'] || {}).length
+        ? newDecisions['sciamanoByPlayer']
+        : (newDecisions['sciamano'] ? { _single: newDecisions['sciamano'] } : {});
       let sciamanoResult = null;
-      // Sciamano: salta se ha già usato il potere (shamanUsed) o se ha passato il turno ('PASS')
-      if(sciamanoDecision && sciamanoDecision !== 'PASS' && pStates[sciamanoDecision] && !pStates[sciamanoDecision].alive) {
-        const risortoPStates = {...pStates, [sciamanoDecision]: {...pStates[sciamanoDecision], alive: true}};
-        setPStates(risortoPStates);
-        if(db && gameId) db.ref(`games/${gameId}/players/${sciamanoDecision}/alive`).set(true);
-        fbUpdate({ shamanUsed: true });
-        sciamanoResult = pStates[sciamanoDecision].name;
+      let sciamanoRevivedId = null;
+      for (const [vid, tgt] of Object.entries(sciamanoByPlayer)) {
+        if(tgt && tgt !== 'PASS' && pStatesRef.current[tgt] && !pStatesRef.current[tgt].alive) {
+          const risorto = {...pStatesRef.current, [tgt]: {...pStatesRef.current[tgt], alive: true}};
+          pStatesRef.current = risorto;
+          setPStates(risorto);
+          if(db && gameId) db.ref(`games/${gameId}/players/${tgt}/alive`).set(true);
+          fbUpdate({ [`shamanUsedBy/${vid}`]: true });
+          if(!sciamanoResult) { sciamanoResult = risorto[tgt].name; sciamanoRevivedId = tgt; }
+        }
       }
 
       // Criceto eliminato dalla Veggente
@@ -3383,13 +3456,15 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         if(wCr) return;
       }
 
-      // Veleno strega
+      // Veleni: uno per ogni Strega che lo ha usato
       let poisonVictimId = null;
-      if(stregaUsedPoison && pStates[stregaDecision]?.alive) {
-        poisonVictimId = stregaDecision;
-        fbUpdate({ witchPoisonUsed: true });
-        const w2 = eliminate(stregaDecision, true);
-        if(w2) return;
+      for (const [vid, tgt] of poisoners) {
+        if(pStatesRef.current[tgt]?.alive) {
+          if(!poisonVictimId) poisonVictimId = tgt; // il primo alimenta narrazione e recap
+          fbUpdate({ [`witchPotions/${vid}/poison`]: true });
+          const w2 = eliminate(tgt, true);
+          if(w2) return;
+        }
       }
 
       // Elimina la vittima dei lupi
@@ -3418,14 +3493,15 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         turn: dayNum,
         wolvesIds,
         wolfTarget:         newDecisions['lupi'] || null,
-        guardiaSaved:       !!(newDecisions['guardia'] && newDecisions['guardia'] === newDecisions['lupi']),
+        guardiaSaved:       !!(newDecisions['lupi'] && guardiaTargets.includes(newDecisions['lupi'])),
         stregaHealed:       stregaUsedHeal && !!newDecisions['lupi'],
-        stregaPoison:       stregaUsedPoison ? stregaDecision : null,
+        stregaPoison:       poisonVictimId,
         dawnVictim:         dawnVictim || null,
         poisonVictim:       poisonVictimId,
         figlioTransformed,
-        sciamanoRevived:    sciamanoDecision && pStates[sciamanoDecision] ? sciamanoDecision : null,
-        cupidoLovers:       dayNum === 1 && Object.keys(lovers).length ? Object.keys(lovers).slice(0,2) : null,
+        sciamanoRevived:    sciamanoRevivedId,
+        // La coppia legata QUESTA notte: Cupido agisce ogni notte, non solo la prima
+        cupidoLovers:       newDecisions['cupido']?.includes(',') ? newDecisions['cupido'].split(',') : null,
         mitomaneTarget:     dayNum === 1 && mitomaneTarget ? mitomaneTarget : null,
       });
 
@@ -4456,7 +4532,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
               {Object.values(pStates).filter(p=>p.alive && p.id !== showCupidoModal).map(p=>(
                 <button key={p.id}
                   onClick={()=>{
-                    const newLovers = {[showCupidoModal]: p.id, [p.id]: showCupidoModal};
+                    const newLovers = linkLovers(showCupidoModal, p.id);
                     setLovers(newLovers);
                     fbUpdate({lovers: newLovers});
                     setShowCupidoModal(null);
@@ -5198,8 +5274,11 @@ function PlayerScreen({gameId, playerId}) {
               player.role === 'strega' ? (() => {
                 const victimId   = gameData.currentNightVictim;
                 const victimName = victimId ? (gameData.players?.[victimId]?.name || '???') : null;
-                const healUsed   = gameData.witchHealUsed || false;
-                const poisonUsed = gameData.witchPoisonUsed || false;
+                // Pozioni per giocatore: con due Streghe (Mitomane) ognuna ha le sue.
+                // I flag globali restano come ripiego per le partite iniziate prima.
+                const myPotions  = gameData.witchPotions?.[playerId] || {};
+                const healUsed   = myPotions.heal   ?? (gameData.witchHealUsed   || false);
+                const poisonUsed = myPotions.poison ?? (gameData.witchPoisonUsed || false);
                 const voted      = localVote || gameData.nightVotes?.[playerId];
 
                 if (voted) {
@@ -5287,7 +5366,8 @@ function PlayerScreen({gameId, playerId}) {
                 </>
               ) : player.role === 'sciamano' ? (() => {
               /* ── SCIAMANO: resuscita un morto (una volta per partita) ── */
-                const shamanUsed = gameData.shamanUsed || false;
+                // Per giocatore: due Sciamani (Mitomane) hanno una resurrezione a testa
+                const shamanUsed = gameData.shamanUsedBy?.[playerId] ?? (gameData.shamanUsed || false);
                 const deadPlayers = Object.entries(gameData.players||{}).filter(([id,p])=>!p.alive);
                 const voted = localVote || gameData.nightVotes?.[playerId];
 
