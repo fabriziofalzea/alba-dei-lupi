@@ -541,7 +541,15 @@ const NIGHT_STEPS = [
 // a notte in corso (Mitomane che eredita, Strega che avvelena) riordinerebbe l'array
 // e farebbe puntare l'indice allo step sbagliato.
 function buildNightSteps(states, dayNumber) {
-  const present = new Set(Object.values(states).filter(p => p.alive).map(p => p.role));
+  // NON si filtra sui vivi: il narratore deve continuare a chiamare anche i ruoli
+  // dei giocatori morti, altrimenti dal silenzio si deduce chi è già stato eliminato.
+  // Si include anche originalRole, così un Figlio dei Lupi diventato lupo continua
+  // a essere chiamato come Figlio e la trasformazione non trapela.
+  const present = new Set();
+  Object.values(states).forEach(p => {
+    if (p.role) present.add(p.role);
+    if (p.originalRole) present.add(p.originalRole);
+  });
   return NIGHT_STEPS.filter(s =>
     (!s.hasRole || present.has(s.roleId)) && (!s.firstNightOnly || dayNumber === 1)
   );
@@ -631,6 +639,57 @@ function checkWin(players, lovers) {
   if (wolves.length === 0) return 'villaggio';
   if (wolves.length >= villagers.length) return 'lupi';
   return null;
+}
+
+/* ================================================================
+   RECAP — formattazione degli eventi di partita
+   Condivisa fra il riepilogo finale dei giocatori e la cronaca che il
+   narratore consulta durante la partita: una sola implementazione, così
+   le due viste non possono raccontare storie diverse.
+   ================================================================ */
+function recapEventLines(ev, players) {
+  const pName = id => players?.[id]?.name || '???';
+  const pRole = id => { const r = ROLES[players?.[id]?.role]; return r ? `${r.icon} ${r.name}` : ''; };
+  const joiner = getLang() === 'en' ? ' and ' : ' e ';
+  const wolvesNames = ids => (ids || []).map(pName).join(joiner);
+  const lines = [];
+
+  if (ev.type === 'night') {
+    if (ev.wolvesIds?.length) {
+      const wolfStr = wolvesNames(ev.wolvesIds);
+      if (ev.wolfTarget) {
+        const targetStr = `${pName(ev.wolfTarget)} (${pRole(ev.wolfTarget)})`;
+        if (ev.guardiaSaved)          lines.push(t('player.wolvesRepelled',   {wolves: wolfStr, target: targetStr}));
+        else if (ev.stregaHealed)     lines.push(t('player.wolvesHealed',     {wolves: wolfStr, target: targetStr}));
+        else if (ev.figlioTransformed)lines.push(t('player.wolvesTransformed',{wolves: wolfStr, name: pName(ev.wolfTarget)}));
+        else if (ev.dawnVictim)       lines.push(t('player.wolvesKilled',     {wolves: wolfStr, target: targetStr}));
+      } else {
+        lines.push(t('player.wolvesNoAgreement', {wolves: wolfStr}));
+      }
+    }
+    if (ev.stregaPoison)      lines.push(t('player.witchPoisonedLog', {target: `${pName(ev.stregaPoison)} (${pRole(ev.stregaPoison)})`}));
+    if (ev.sciamanoRevived)   lines.push(t('player.shamanRevivedLog', {name: pName(ev.sciamanoRevived)}));
+    if (ev.cupidoLovers?.length === 2) lines.push(t('player.cupidoBoundLog', {name1: pName(ev.cupidoLovers[0]), name2: pName(ev.cupidoLovers[1])}));
+    if (ev.mitomaneTarget)    lines.push(t('player.mitomaneChoseLog', {target: `${pName(ev.mitomaneTarget)} (${pRole(ev.mitomaneTarget)})`}));
+    if (!lines.length)        lines.push(t('player.nightSilent'));
+  }
+
+  if (ev.type === 'day') {
+    lines.push(ev.noMajority
+      ? t('player.dayNoAgreement')
+      : t('player.dayCondemnedLog', {target: `${pName(ev.dayVictim)} (${pRole(ev.dayVictim)})`}));
+  }
+  return lines;
+}
+
+// Voti del giorno raggruppati per bersaglio, dal più votato in giù
+function recapVoteGroups(ev, players) {
+  if (!ev.votes?.length) return null;
+  const byTarget = {};
+  ev.votes.forEach(v => { (byTarget[v.targetId] ||= []).push(players?.[v.voterId]?.name || '???'); });
+  return Object.entries(byTarget)
+    .map(([tid, voters]) => ({ name: players?.[tid]?.name || '???', voters }))
+    .sort((a, b) => b.voters.length - a.voters.length);
 }
 
 /* ================================================================
@@ -3016,6 +3075,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const [showVotesPanel, setShowVotesPanel] = useState(false);
   const [narration, setNarration] = useState('');
   const [showNarrationLog, setShowNarrationLog] = useState(false);
+  const [showChronicle, setShowChronicle] = useState(false); // cronaca notti per il narratore
+  const [chronicleVersion, setChronicleVersion] = useState(0); // forza il ridisegno quando arriva un evento
   const [narrationLog, setNarrationLog] = useState([]);
   const [readyCount, setReadyCount] = useState(0);
   const [winner, setWinner] = useState(null);
@@ -3190,6 +3251,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   // Aggiunge un evento al log locale (usato per costruire il recap a fine partita)
   const pushEvent = useCallback((entry) => {
     eventLogRef.current = [...eventLogRef.current, entry];
+    // Il ref da solo non ridisegna: senza questo la cronaca del narratore resterebbe indietro
+    setChronicleVersion(v => v + 1);
   }, []);
 
   // Pubblica il recap completo su Firebase quando la partita finisce
@@ -3841,6 +3904,53 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
             <p className="font-cinzel text-white text-base leading-relaxed italic">
               "{narration}"
             </p>
+          </div>
+        )}
+
+        {/* ── CRONACA DELLE NOTTI — serve al narratore per raccontare cosa è successo ──
+            Sta solo qui: i giocatori la vedono soltanto a partita finita. */}
+        {eventLogRef.current.length > 0 && (
+          <div className="mb-4">
+            <button
+              onClick={() => setShowChronicle(v => !v)}
+              className="flex items-center gap-2 text-xs transition-colors"
+              style={{color:'rgba(226,201,126,0.75)'}}
+            >
+              <span>{showChronicle ? '▾' : '▸'}</span>
+              <span>📖 {t('gameMaster.chronicle')}</span>
+            </button>
+            {showChronicle && (
+              <div className="mt-2 rounded-xl px-3 py-3 max-h-72 overflow-y-auto space-y-3"
+                   style={{background:'rgba(226,201,126,0.05)', border:'1px solid rgba(226,201,126,0.18)'}}>
+                {eventLogRef.current.map((ev, i) => {
+                  const ordinals = t('player.ordinals');
+                  const ordinal = ordinals[ev.turn-1] || t('player.turnFallback', {n: ev.turn});
+                  const lines = recapEventLines(ev, pStates);
+                  const groups = ev.type === 'day' ? recapVoteGroups(ev, pStates) : null;
+                  return (
+                    <div key={i}>
+                      <p className="font-cinzel text-[11px] font-bold uppercase tracking-wider mb-1"
+                         style={{color: ev.type === 'night' ? '#a5b4fc' : '#fcd34d'}}>
+                        {ev.type === 'night' ? '🌙' : '☀️'} {ordinal} {ev.type === 'night' ? t('player.nightSuffix') : t('player.daySuffix')}
+                      </p>
+                      {lines.map((l, li) => (
+                        <p key={li} className="text-gray-300 text-xs leading-relaxed mb-0.5">{l}</p>
+                      ))}
+                      {groups && (
+                        <div className="mt-1 pl-2" style={{borderLeft:'2px solid rgba(255,255,255,0.12)'}}>
+                          {groups.map((g, gi) => (
+                            <p key={gi} className="text-gray-500 text-[11px] leading-snug">
+                              <span className="text-gray-400 font-bold">{g.name}</span> ← {g.voters.join(', ')}
+                              <span className="text-gray-600"> ({g.voters.length})</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -5692,10 +5802,6 @@ function PlayerScreen({gameId, playerId}) {
           {gameData.gameRecap?.eventLog?.length > 0 && (() => {
             const recap    = gameData.gameRecap;
             const allPlayers = recap.players || gameData.players || {};
-            const pName = id => allPlayers[id]?.name || '???';
-            const pRole = id => { const r = ROLES[allPlayers[id]?.role]; return r ? `${r.icon} ${r.name}` : ''; };
-            const wolvesNamesJoiner = getLang() === 'en' ? ' and ' : ' e ';
-            const wolvesNames = ids => (ids||[]).map(id=>`${pName(id)}`).join(wolvesNamesJoiner);
             const ordinals = t('player.ordinals');
 
             return (
@@ -5705,95 +5811,29 @@ function PlayerScreen({gameId, playerId}) {
                 <div className="flex flex-col gap-5">
                   {recap.eventLog.map((ev, i) => {
                     const ordinal = ordinals[ev.turn-1] || t('player.turnFallback', {n: ev.turn});
-
-                    if (ev.type === 'night') {
-                      const lines = [];
-
-                      // Lupi e vittima
-                      if (ev.wolvesIds?.length) {
-                        const wolfStr = wolvesNames(ev.wolvesIds);
-                        if (ev.wolfTarget) {
-                          const targetStr = `${pName(ev.wolfTarget)} (${pRole(ev.wolfTarget)})`;
-                          if (ev.guardiaSaved) {
-                            lines.push(t('player.wolvesRepelled', {wolves: wolfStr, target: targetStr}));
-                          } else if (ev.stregaHealed) {
-                            lines.push(t('player.wolvesHealed', {wolves: wolfStr, target: targetStr}));
-                          } else if (ev.figlioTransformed) {
-                            lines.push(t('player.wolvesTransformed', {wolves: wolfStr, name: pName(ev.wolfTarget)}));
-                          } else if (ev.dawnVictim) {
-                            lines.push(t('player.wolvesKilled', {wolves: wolfStr, target: targetStr}));
-                          }
-                        } else {
-                          lines.push(t('player.wolvesNoAgreement', {wolves: wolfStr}));
-                        }
-                      }
-
-                      // Veleno strega
-                      if (ev.stregaPoison) {
-                        lines.push(t('player.witchPoisonedLog', {target: `${pName(ev.stregaPoison)} (${pRole(ev.stregaPoison)})`}));
-                      }
-
-                      // Sciamano
-                      if (ev.sciamanoRevived) {
-                        lines.push(t('player.shamanRevivedLog', {name: pName(ev.sciamanoRevived)}));
-                      }
-
-                      // Prima notte: Cupido
-                      if (ev.cupidoLovers?.length === 2) {
-                        lines.push(t('player.cupidoBoundLog', {name1: pName(ev.cupidoLovers[0]), name2: pName(ev.cupidoLovers[1])}));
-                      }
-
-                      // Prima notte: Mitomane
-                      if (ev.mitomaneTarget) {
-                        lines.push(t('player.mitomaneChoseLog', {target: `${pName(ev.mitomaneTarget)} (${pRole(ev.mitomaneTarget)})`}));
-                      }
-
-                      if (!lines.length) lines.push(t('player.nightSilent'));
-
-                      return (
-                        <div key={i}>
-                          <p className="font-cinzel text-moon text-xs font-bold mb-2 uppercase tracking-wider">
-                            🌙 {ordinal} {t('player.nightSuffix')}
-                          </p>
-                          {lines.map((l, li) => (
-                            <p key={li} className="text-gray-300 text-sm leading-relaxed mb-1">{l}</p>
-                          ))}
-                        </div>
-                      );
-                    }
-
-                    if (ev.type === 'day') {
-                      return (
-                        <div key={i}>
-                          <p className="font-cinzel text-moon text-xs font-bold mb-2 uppercase tracking-wider">
-                            ☀️ {ordinal} {t('player.daySuffix')}
-                          </p>
-                          {ev.noMajority
-                            ? <p className="text-gray-300 text-sm">{t('player.dayNoAgreement')}</p>
-                            : <p className="text-gray-300 text-sm">{t('player.dayCondemnedLog', {target: `${pName(ev.dayVictim)} (${pRole(ev.dayVictim)})`})}</p>
-                          }
-                          {/* Dettaglio del voto: chi ha votato chi, raggruppato per bersaglio */}
-                          {ev.votes?.length > 0 && (() => {
-                            const byTarget = {};
-                            ev.votes.forEach(v => { (byTarget[v.targetId] ||= []).push(pName(v.voterId)); });
-                            return (
-                              <div className="mt-2 pl-3" style={{borderLeft:'2px solid rgba(255,255,255,0.1)'}}>
-                                {Object.entries(byTarget)
-                                  .sort((a, b) => b[1].length - a[1].length)
-                                  .map(([tid, voters]) => (
-                                    <p key={tid} className="text-gray-500 text-xs leading-snug">
-                                      <span className="text-gray-400 font-bold">{pName(tid)}</span>
-                                      {' '}←{' '}{voters.join(', ')}
-                                      <span className="text-gray-600"> ({voters.length})</span>
-                                    </p>
-                                  ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    }
-                    return null;
+                    // Stessa formattazione della cronaca del narratore: una sola fonte
+                    const lines  = recapEventLines(ev, allPlayers);
+                    const groups = ev.type === 'day' ? recapVoteGroups(ev, allPlayers) : null;
+                    return (
+                      <div key={i}>
+                        <p className="font-cinzel text-moon text-xs font-bold mb-2 uppercase tracking-wider">
+                          {ev.type === 'night' ? '🌙' : '☀️'} {ordinal} {ev.type === 'night' ? t('player.nightSuffix') : t('player.daySuffix')}
+                        </p>
+                        {lines.map((l, li) => (
+                          <p key={li} className="text-gray-300 text-sm leading-relaxed mb-1">{l}</p>
+                        ))}
+                        {groups && (
+                          <div className="mt-2 pl-3" style={{borderLeft:'2px solid rgba(255,255,255,0.1)'}}>
+                            {groups.map((g, gi) => (
+                              <p key={gi} className="text-gray-500 text-xs leading-snug">
+                                <span className="text-gray-400 font-bold">{g.name}</span>{' '}←{' '}{g.voters.join(', ')}
+                                <span className="text-gray-600"> ({g.voters.length})</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
               </div>
