@@ -451,8 +451,8 @@ const ROLES = {
     id:'mitomane', name:'Mitomane', team:'villaggio', color:'#9c27b0', icon:'🎭',
     abbr:'Mi', pack:'villaggio',
     category:'speciale', wakeOrder:0.5, nightAction:true,
-    description:'La prima notte sceglie segretamente un giocatore da imitare. Per tutta la partita la Veggente lo vede come quel ruolo. Vince con il villaggio.',
-    tip:'Imita un lupo per sviare la Veggente — ma attento a non farti smascherare di giorno.'
+    description:'La prima notte scegli un giocatore da imitare: ne assumi immediatamente il ruolo, i poteri e la squadra. Se imiti un lupo diventi un lupo a tutti gli effetti, ti svegli col branco e vinci con loro.',
+    tip:'La scelta è irreversibile e vale per tutta la partita: guarda bene chi hai davanti prima di decidere.'
   },
   figlio_dei_lupi: {
     id:'figlio_dei_lupi', name:'Figlio dei Lupi', team:'villaggio', color:'#78350f', icon:'🐺',
@@ -598,12 +598,17 @@ function uid(len=8) {
 // Token che identifica il dispositivo per la guardia anti-furto del QR.
 // Attenzione: Safari e la WebView nativa hanno localStorage separati, quindi lo stesso
 // telefono ne genererebbe due diversi — per questo il deep link se lo porta dietro.
-function getDeviceToken() {
+// La chiave è PER PARTITA: con una chiave globale, aprire il deep link di un'altra
+// partita sovrascriverebbe il token e ti farebbe espellere da quella in corso.
+function deviceTokenKey(gameId) { return `lif_device_token_${gameId || 'default'}`; }
+
+function getDeviceToken(gameId) {
   try {
-    let tk = localStorage.getItem('lif_device_token');
+    const key = deviceTokenKey(gameId);
+    let tk = localStorage.getItem(key);
     if (!tk) {
       tk = Math.random().toString(36).substring(2);
-      localStorage.setItem('lif_device_token', tk);
+      localStorage.setItem(key, tk);
     }
     return tk;
   } catch { return 'nostorage'; }
@@ -2431,6 +2436,14 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
   const evilTotal = wolfCount + traitorCount;
   const recommended = rolesNeeded <= 5 ? 1 : rolesNeeded <= 8 ? 2 : rolesNeeded <= 11 ? 3 : 4;
   const wolfDiff = evilTotal - recommended;
+  // Il Mitomane può copiare un lupo e diventarlo davvero: da quel momento conta
+  // fra i lupi anche per la parità. Se i lupi sono già al massimo consigliato,
+  // la trasformazione può chiudere la partita alla prima alba — va detto prima.
+  // Se i Mitomani copiano tutti un lupo: lupi = W+M, villaggio = N-W-M. All'alba muore
+  // un villico, quindi i lupi vincono subito quando W+M >= N-W-M-1, cioè 2(W+M)+1 >= N.
+  const mitomaneCount = roles.filter(rid => rid === 'mitomane').length;
+  const mitomaneRisk = mitomaneCount > 0 &&
+    (2 * (wolfCount + mitomaneCount) + 1) >= rolesNeeded;
   const wolfAdvice = wolfDiff === 0
     ? { text: t('createGame.recommendedPerfect', {n: rolesNeeded}), color: '#4ade80' }
     : wolfDiff === 1 ? { text: t('createGame.recommendedHarder'), color: '#fbbf24' }
@@ -2922,6 +2935,12 @@ function CreateGameScreen({onStart, onBack, initialSetup, userId}) {
               {evilTotal > recommended && ` · ${t('createGame.evilTooMany', {n: recommended})}`}
             </p>
           )}
+          {/* Il Mitomane può trasformarsi in lupo e far saltare la parità */}
+          {mitomaneRisk && (
+            <p className="text-[11px] text-center mb-2 px-1 leading-snug" style={{color:'#fbbf24'}}>
+              🎭 {t('createGame.mitomaneRisk', {n: wolfCount + mitomaneCount})}
+            </p>
+          )}
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-gray-600 text-xs">🐺 ×{wolfCount} · {wolfCount + roles.length}/{rolesNeeded}</span>
             <span className={`text-xs font-bold ${spotsLeft === 0 ? 'text-green-400' : 'text-gray-500'}`}>
@@ -3164,7 +3183,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   };
 
   const eliminate = (pid, silent=false) => {
-    let newStates = {...pStates, [pid]:{...pStates[pid], alive:false}};
+    // Base = pStatesRef, non la closure pStates: all'alba possono cadere più giocatori
+    // nello stesso tick (veleno della Strega + vittima dei lupi). Partendo dalla closure
+    // ogni chiamata ripartirebbe dallo stato iniziale e l'ultima resusciterebbe le altre.
+    const base = pStatesRef.current;
+    let newStates = {...base, [pid]:{...base[pid], alive:false}};
     if(db && gameId) db.ref(`games/${gameId}/players/${pid}/alive`).set(false);
     if(!silent) window.playSfx('dead');
 
@@ -3175,6 +3198,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       if(db && gameId) db.ref(`games/${gameId}/players/${partnerId}/alive`).set(false);
     }
 
+    pStatesRef.current = newStates; // subito, così la prossima eliminazione dello stesso tick la vede
     setPStates(newStates);
     const w = checkWin(newStates, lovers);
     if(w) {
@@ -3234,6 +3258,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
   const processNightStep = ()=>{
     if (phase !== 'night') return; // Blocca timer stantii che sparano dopo il cambio fase
+    // Se il narratore avanza a mano mentre un timer è armato, quel timer scadrebbe
+    // dopo il cambio di step e ne farebbe saltare uno: va disinnescato qui.
+    clearTimeout(engineTimer.current);
+    scheduledKey.current = null;
     const step = activeNightSteps[nightStep];
     let newDecisions = { ...nightDecisions };
     
@@ -3277,8 +3305,15 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         const copiedRole = pStates[target]?.role;
         const mitomaneId = Object.keys(pStates).find(id => pStates[id]?.alive && pStates[id]?.role === 'mitomane');
         if (copiedRole && copiedRole !== 'mitomane' && mitomaneId) {
-          setPStates(prev => ({ ...prev, [mitomaneId]: { ...prev[mitomaneId], role: copiedRole } }));
-          if(db && gameId) db.ref(`games/${gameId}/players/${mitomaneId}/role`).set(copiedRole);
+          const next = { ...pStatesRef.current,
+            [mitomaneId]: { ...pStatesRef.current[mitomaneId], role: copiedRole, originalRole: 'mitomane' } };
+          pStatesRef.current = next;
+          setPStates(next);
+          if(db && gameId) {
+            db.ref(`games/${gameId}/players/${mitomaneId}/role`).set(copiedRole);
+            // serve al recap: senza, a fine partita il Mitomane sparisce e sembra che i lupi fossero uno in più
+            db.ref(`games/${gameId}/players/${mitomaneId}/originalRole`).set('mitomane');
+          }
         }
       }
     }
@@ -3298,12 +3333,16 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
       // Figlio dei Lupi: si trasforma invece di morire
       let figlioTransformed = false;
-      let pStatesForLog = pStates; // snapshot locale aggiornato per il recap (evita stale setPStates)
-      if(dawnVictim && ROLES[pStates[dawnVictim]?.role]?.becomesWolfIfKilled) {
+      let pStatesForLog = pStatesRef.current; // stato più aggiornato, non la closure
+      if(dawnVictim && ROLES[pStatesForLog[dawnVictim]?.role]?.becomesWolfIfKilled) {
         const figlioId = dawnVictim;
-        pStatesForLog = {...pStates, [figlioId]: {...pStates[figlioId], role: 'lupo'}};
+        pStatesForLog = {...pStatesForLog, [figlioId]: {...pStatesForLog[figlioId], role: 'lupo', originalRole: 'figlio_dei_lupi'}};
+        pStatesRef.current = pStatesForLog;
         setPStates(pStatesForLog);
-        if(db && gameId) db.ref(`games/${gameId}/players/${figlioId}/role`).set('lupo');
+        if(db && gameId) {
+          db.ref(`games/${gameId}/players/${figlioId}/role`).set('lupo');
+          db.ref(`games/${gameId}/players/${figlioId}/originalRole`).set('figlio_dei_lupi');
+        }
         dawnVictim = null;
         figlioTransformed = true;
       }
@@ -4696,6 +4735,7 @@ function PlayerScreen({gameId, playerId}) {
   const [debugLog, setDebugLog] = useState('');
   const [error, setError] = useState(null);
   const [deviceConflict, setDeviceConflict] = useState(false); // token QR di un altro dispositivo
+  const [showPack, setShowPack] = useState(false); // elenco lupi scoperto di giorno
   const [showRoleInfo, setShowRoleInfo] = useState(false);
   const [showRolesInGame, setShowRolesInGame] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -4718,7 +4758,7 @@ function PlayerScreen({gameId, playerId}) {
       return;
     }
 
-    const deviceToken = getDeviceToken();
+    const deviceToken = getDeviceToken(gameId);
 
     const ref = db.ref(`games/${gameId}`);
     ref.on('value', snap=>{
@@ -4756,6 +4796,9 @@ function PlayerScreen({gameId, playerId}) {
   const player = gameData?.players?.[playerId];
   const phase = gameData?.phase || 'waiting';
   const role = player ? ROLES[player.role] : null;
+  // Il Mitomane e il Figlio dei Lupi cambiano ruolo a partita in corso: senza un avviso
+  // esplicito la carta cambierebbe sotto gli occhi del giocatore senza spiegazioni.
+  const transformedFrom = player?.originalRole ? ROLES[player.originalRole] : null;
 
   const castVote = (targetId) => {
     if (localVote || gameData?.nightVotes?.[playerId]) return;
@@ -4824,7 +4867,7 @@ function PlayerScreen({gameId, playerId}) {
           <button
             onClick={() => {
               if (db && gameId && playerId) {
-                db.ref(`games/${gameId}/players/${playerId}/deviceToken`).set(getDeviceToken());
+                db.ref(`games/${gameId}/players/${playerId}/deviceToken`).set(getDeviceToken(gameId));
               }
               setDeviceConflict(false);
               setError(null); // il listener Firebase è ancora attivo e ricaricherà la partita
@@ -4862,7 +4905,7 @@ function PlayerScreen({gameId, playerId}) {
   // Il token viaggia nel deep link: Safari e la WebView nativa hanno localStorage separati,
   // quindi senza passarlo l'app genererebbe un token nuovo e la guardia anti-furto
   // bloccherebbe il giocatore sul suo stesso telefono.
-  const deepLinkUrl = `lupus://join?game=${gameId}&player=${playerId}&dt=${encodeURIComponent(getDeviceToken())}`;
+  const deepLinkUrl = `lupus://join?game=${gameId}&player=${playerId}&dt=${encodeURIComponent(getDeviceToken(gameId))}`;
 
   return (
     <div className={`min-h-screen layer screen-safe px-4 pb-44 ${(phase === 'role_reveal' || phase === 'waiting') ? 'pt-3' : 'py-6'} ${phaseDisplay.bg}`} style={{ pointerEvents: 'auto' }}>
@@ -5069,6 +5112,19 @@ function PlayerScreen({gameId, playerId}) {
           </>
           )}
 
+          {/* ── TRASFORMAZIONE: spiega perché la carta è cambiata ── */}
+          {player.alive && transformedFrom && role && (
+            <div className="w-full mb-3 p-3 rounded-2xl text-center anim-fade-in"
+                 style={{background:`${role.color}1f`, border:`1px solid ${role.color}66`}}>
+              <p className="text-[11px] leading-snug" style={{color:'#e2c97e'}}>
+                {transformedFrom.icon} {transformedFrom.name} → {role.icon} <strong>{role.name}</strong>
+              </p>
+              <p className="text-gray-400 text-[11px] mt-1 leading-snug">
+                {t('player.nowWinsWith', {team: role.team === 'lupi' ? t('teams.lupi') : t('teams.villaggio')})}
+              </p>
+            </div>
+          )}
+
           {/* ── ALLEATI: i lupi si riconoscono fra loro; l'Indemoniato conosce i lupi ── */}
           {player.alive && (() => {
             const iAmWolf    = ROLES[player.role]?.team === 'lupi';
@@ -5079,11 +5135,30 @@ function PlayerScreen({gameId, playerId}) {
             const wolves = Object.entries(gameData.players || {})
               .filter(([, p]) => ROLES[p.role]?.team === 'lupi');
             if (!wolves.length) return null;
+            // Di giorno e in votazione i telefoni sono esposti agli sguardi dei vicini:
+            // l'elenco resta accessibile ma va scoperto apposta.
+            const daylight = phase === 'day' || phase === 'voting';
+            if (daylight && !showPack) {
+              return (
+                <button onClick={() => setShowPack(true)}
+                        className="w-full mt-1 mb-3 p-2.5 rounded-2xl text-[11px] font-bold transition-all active:scale-95"
+                        style={{background:'rgba(192,57,43,0.10)', border:'1px solid rgba(192,57,43,0.3)', color:'#ef8a80'}}>
+                  🐺 {t('player.revealPack')}
+                </button>
+              );
+            }
             return (
               <div className="w-full mt-1 mb-3 p-3 rounded-2xl text-left anim-fade-in"
                    style={{background:'rgba(192,57,43,0.12)', border:'1px solid rgba(192,57,43,0.4)'}}>
-                <p className="text-[10px] uppercase tracking-widest mb-2" style={{color:'#ef8a80'}}>
-                  🐺 {iAmWolf ? t('player.yourPack') : t('player.wolvesYouKnow')}
+                <p className="text-[10px] uppercase tracking-widest mb-2 flex items-center justify-between" style={{color:'#ef8a80'}}>
+                  <span>🐺 {iAmWolf ? t('player.yourPack') : t('player.wolvesYouKnow')}</span>
+                  {daylight && (
+                    <button onClick={() => setShowPack(false)}
+                            className="text-[10px] px-2 py-0.5 rounded-full"
+                            style={{background:'rgba(0,0,0,0.35)', border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.7)'}}>
+                      🙈
+                    </button>
+                  )}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {wolves.map(([wid, w]) => (
@@ -5398,9 +5473,16 @@ function PlayerScreen({gameId, playerId}) {
             const isPublic = gameData.publicVote !== false;
             const castVotes = gameData.dayVotes || {};
             // targetId → nomi di chi lo ha votato
+            // Il peso deve combaciare con resolveDayVoting, dove il Sindaco vale 2:
+            // mostrare le teste farebbe sbagliare i conti al tavolo proprio nel momento
+            // in cui il voto palese serve a farli tornare.
             const votersByTarget = {};
+            const weightByTarget = {};
             Object.entries(castVotes).forEach(([voterId, targetId]) => {
-              (votersByTarget[targetId] ||= []).push(gameData.players?.[voterId]?.name || '?');
+              const vp = gameData.players?.[voterId];
+              const w = ROLES[vp?.role]?.voteWeight || 1;
+              (votersByTarget[targetId] ||= []).push(vp?.name ? (w > 1 ? `${vp.name} ×${w}` : vp.name) : '?');
+              weightByTarget[targetId] = (weightByTarget[targetId] || 0) + w;
             });
             return (
             <div className="mt-6 p-4 rounded-2xl anim-fade-up text-left" style={{background:role?.color+'1a', border:`1px solid ${role?.color}44`}}>
@@ -5433,7 +5515,7 @@ function PlayerScreen({gameId, playerId}) {
                         {voters.length > 0 && (
                           <span className="text-sm font-bold px-2.5 py-1 rounded-full"
                                 style={{background:'rgba(239,68,68,0.3)', border:'1px solid rgba(239,68,68,0.65)', color:'#fff'}}>
-                            {voters.length}
+                            {weightByTarget[id] || voters.length}
                           </span>
                         )}
                         {isSelected ? <span className="text-4xl">🔥</span> : <div className="w-10 h-10 rounded-full border-2 border-white/40"></div>}
@@ -5986,7 +6068,14 @@ function App() {
     // ne genererebbe uno nuovo (localStorage separato) e verrebbe scambiata per un ladro di QR.
     const adoptDeviceToken = (url) => {
       const dt = url.searchParams.get('dt');
-      if (dt) { try { localStorage.setItem('lif_device_token', dt); } catch {} }
+      const g  = url.searchParams.get('game');
+      if (!dt || !g) return;
+      try {
+        // Solo se non abbiamo già un token per QUESTA partita: altrimenti un link
+        // ricevuto da qualcun altro sovrascriverebbe il nostro e ci farebbe espellere.
+        const key = deviceTokenKey(g);
+        if (!localStorage.getItem(key)) localStorage.setItem(key, dt);
+      } catch {}
     };
     const setupDeepLink = async () => {
       try {
