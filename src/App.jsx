@@ -3250,10 +3250,36 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
   // Aggiunge un evento al log locale (usato per costruire il recap a fine partita)
   const pushEvent = useCallback((entry) => {
-    eventLogRef.current = [...eventLogRef.current, entry];
+    const next = [...eventLogRef.current, entry];
+    eventLogRef.current = next;
     // Il ref da solo non ridisegna: senza questo la cronaca del narratore resterebbe indietro
     setChronicleVersion(v => v + 1);
-  }, []);
+    // Persistita su Firebase: senza, basta che il telefono del narratore ricarichi la
+    // pagina e il resoconto delle notti sparisce proprio quando deve raccontarlo.
+    // ⚠️ Sta dentro games/<id> perché le regole del database consentono solo quel
+    // percorso (un ramo separato dà PERMISSION_DENIED). Di conseguenza la cronaca
+    // arriva anche nel payload dei giocatori: non è un peggioramento reale, perché
+    // quel payload contiene già il ruolo di tutti — ma per chiuderla davvero servono
+    // regole Firebase più strette, non solo spostare questo campo.
+    if (db && gameId) db.ref(`games/${gameId}/narratorLog`).set(next);
+  }, [gameId]);
+
+  // Ripristina la cronaca se il narratore ricarica la pagina a partita in corso
+  useEffect(() => {
+    if (!db || !gameId) return;
+    db.ref(`games/${gameId}/narratorLog`).once('value').then(snap => {
+      const raw = snap.val();
+      if (!raw) return;
+      // Firebase restituisce un oggetto (non un array) se gli indici non sono contigui
+      const restored = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw);
+      // Solo se il ripristino è più completo di quanto già in memoria: così non
+      // sovrascrive eventi appena aggiunti in locale e non ancora scritti
+      if (restored.length > eventLogRef.current.length) {
+        eventLogRef.current = restored;
+        setChronicleVersion(v => v + 1);
+      }
+    }).catch(() => {});
+  }, [gameId]);
 
   // Pubblica il recap completo su Firebase quando la partita finisce
   const publishRecap = useCallback((winnerTeam, finalStates) => {
