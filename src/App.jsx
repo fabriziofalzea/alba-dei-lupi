@@ -3373,7 +3373,13 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
     // Se il narratore avanza a mano mentre un timer è armato, quel timer scadrebbe
     // dopo il cambio di step e ne farebbe saltare uno: va disinnescato qui.
     clearTimeout(engineTimer.current);
-    scheduledKey.current = null;
+    // La chiave NON va azzerata: va marcata come già consumata per QUESTO passo.
+    // Azzerandola, un render intermedio (prima che setNightStep si applichi) rientra
+    // nel motore, ripianifica l'avanzamento dello stesso passo, e quel timer scatta
+    // quando siamo già su quello dopo — saltandolo. Succede in modo eclatante al passo
+    // del Mitomane: appena cambia ruolo, aliveOfRole('mitomane') è 0 e il motore
+    // pianifica un avanzamento "a vuoto" a 7 secondi che ricade sul ruolo successivo.
+    scheduledKey.current = `${phase}-${nightStep}-processNightStep`;
     const step = activeNightSteps[nightStep];
     let newDecisions = { ...nightDecisions };
     
@@ -4471,7 +4477,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
               <h3 className="font-cinzel text-2xl font-bold text-moon mb-1 win-glow">
                 {winner==='lupi'?t('gameMaster.winnersLupi'):winner==='amore'?t('gameMaster.winnersAmore'):t('gameMaster.winnersVillaggio')}
               </h3>
-              <p className="text-gray-500 text-sm">{t('gameMaster.matchNumDay', {id: gameId, day: dayNum})}</p>
+              {/* La partita finisce di giorno o all'alba: vale la giornata in corso, non la notte successiva */}
+              <p className="text-gray-500 text-sm">{t('gameMaster.matchNumDay', {id: gameId, day: currentDayNum})}</p>
             </div>
 
             {/* Recap narrativo */}
