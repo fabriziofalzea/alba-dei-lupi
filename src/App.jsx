@@ -3264,6 +3264,43 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
     if (db && gameId) db.ref(`games/${gameId}/narratorLog`).set(next);
   }, [gameId]);
 
+  // ── REIDRATAZIONE NARRATORE ────────────────────────────────────────────────
+  // Fase, giorno, passo notturno e decisioni vivono solo in memoria: dopo un
+  // ricaricamento la partita sarebbe ingiocabile. Qui si rileggono da Firebase.
+  // `rehydrated` fa anche da guardia allo specchio più sotto: non si scrive nulla
+  // finché non si è letto, altrimenti i valori iniziali sovrascriverebbero quelli veri.
+  const [rehydrated, setRehydrated] = useState(false);
+  useEffect(() => {
+    if (!db || !gameId || rehydrated) return;
+    db.ref(`games/${gameId}`).once('value').then(snap => {
+      const g = snap.val();
+      if (!g) { setRehydrated(true); return; }
+      if (g.players) {
+        setPStates(prev => {
+          const next = { ...prev };
+          Object.entries(g.players).forEach(([id, p]) => {
+            next[id] = { ...(next[id] || {}), ...p, id };
+          });
+          return next;
+        });
+      }
+      if (typeof g.dayNum === 'number')   setDayNum(g.dayNum);
+      if (typeof g.nightStep === 'number') setNightStep(g.nightStep);
+      if (g.nightDecisions)  setNightDecisions(g.nightDecisions);
+      if (g.lovers)          setLovers(g.lovers);
+      if (g.mitomaneTarget)  setMitomaneTarget(g.mitomaneTarget);
+      // La fase per ultima: fa ripartire il motore, e vuole il resto già a posto
+      if (g.phase && g.phase !== 'waiting') setPhase(g.phase);
+      setRehydrated(true);
+    }).catch(() => setRehydrated(true));
+  }, [gameId, rehydrated]);
+
+  // Specchia su Firebase ciò che prima viveva solo in locale
+  useEffect(() => {
+    if (!rehydrated || !db || !gameId) return;
+    fbUpdate({ dayNum, nightStep, nightDecisions: nightDecisions || null });
+  }, [rehydrated, dayNum, nightStep, nightDecisions, gameId, fbUpdate]);
+
   // Ripristina la cronaca se il narratore ricarica la pagina a partita in corso
   useEffect(() => {
     if (!db || !gameId) return;
@@ -6186,6 +6223,7 @@ function App() {
 
   const [lastGameSetup, setLastGameSetup] = useState(null);
   const [rejoinInfo, setRejoinInfo] = useState(null); // {gameId, playerId, playerName}
+  const [gmResumeInfo, setGmResumeInfo] = useState(null); // {gameId, phase} — rientro narratore
 
   // Helper: naviga al PlayerScreen dai parametri game+player
   const openPlayerScreen = useCallback((g, p) => {
@@ -6232,6 +6270,25 @@ function App() {
       }
     } catch(e) { localStorage.removeItem('lif_rejoin'); }
 
+    // 2c) Sessione NARRATORE: senza questo, un ricaricamento della sua pagina
+    // lascia il tavolo senza narratore e la partita è irrecuperabile.
+    try {
+      const savedGm = localStorage.getItem('lif_gm_session');
+      if (savedGm) {
+        const { gameId: mg, savedAt } = JSON.parse(savedGm);
+        const age = Date.now() - (savedAt || 0);
+        if (mg && age < 12 * 60 * 60 * 1000 && db) {
+          db.ref(`games/${mg}/phase`).once('value').then(snap => {
+            const ph = snap.val();
+            if (ph && ph !== 'ended') setGmResumeInfo({ gameId: mg, phase: ph });
+            else localStorage.removeItem('lif_gm_session');
+          }).catch(() => {});
+        } else if (!mg || age >= 12 * 60 * 60 * 1000) {
+          localStorage.removeItem('lif_gm_session');
+        }
+      }
+    } catch(e) { localStorage.removeItem('lif_gm_session'); }
+
     // 2) Native app: gestisci deep link lupus://join?game=XXX&player=YYY&dt=TOKEN
     // Il parametro dt trasporta il token dispositivo dalla pagina web: senza, l'app
     // ne genererebbe uno nuovo (localStorage separato) e verrebbe scambiata per un ladro di QR.
@@ -6276,15 +6333,48 @@ function App() {
   const handleCreateGame = (withRoles, gid, _narratorName, publicVote = true) => {
     // Save to Firebase
     if(db){
-      const fbPlayers = withRoles.reduce((acc,p)=>({...acc,[p.id]:{name:p.name,role:p.role,alive:true,ready:false}}),{});
+      // isNarrator va salvato: senza, al rientro del narratore in una partita in corso
+      // si perderebbe chi è il narratore-giocatore e la sua scheda ruolo sparirebbe.
+      const fbPlayers = withRoles.reduce((acc,p)=>({...acc,[p.id]:{
+        name:p.name, role:p.role, alive:true, ready:false,
+        ...(p.isNarrator ? {isNarrator:true} : {})
+      }}),{});
       db.ref(`games/${gid}`).set({ id:gid, phase:'waiting', createdAt:Date.now(), players:fbPlayers, publicVote });
     }
+    // Sessione narratore: permette di rientrare se la pagina ricarica a partita in corso
+    try {
+      localStorage.setItem('lif_gm_session', JSON.stringify({ gameId: gid, savedAt: Date.now() }));
+    } catch(e) {}
     setPlayers(withRoles);
     setGameId(gid);
     setScreen('master');
   };
 
+  // Rientro del narratore in una partita in corso dopo un ricaricamento.
+  // Ricostruisce la lista giocatori da Firebase: GameMasterScreen la riceve come prop
+  // e da lì reidrata il resto (fase, giorno, passo notturno) al montaggio.
+  const resumeAsNarrator = useCallback(async (gid) => {
+    if (!db || !gid) return;
+    const snap = await db.ref(`games/${gid}`).once('value');
+    const g = snap.val();
+    if (!g || !g.players) return;
+    const rebuilt = Object.entries(g.players).map(([id, p]) => ({
+      id, name: p.name, role: p.role,
+      alive: p.alive !== false, ready: !!p.ready,
+      ...(p.originalRole ? { originalRole: p.originalRole } : {}),
+      ...(p.isNarrator ? { isNarrator: true } : {}),
+    }));
+    setPlayers(rebuilt);
+    setGameId(gid);
+    setScreen('master');
+    setGmResumeInfo(null);
+  }, []);
+
   const handleEndGame = (result, setup) => {
+    // Partita chiusa: la sessione narratore non serve più, altrimenti al prossimo
+    // avvio comparirebbe un banner che invita a rientrare in una partita finita.
+    try { localStorage.removeItem('lif_gm_session'); } catch(e) {}
+    setGmResumeInfo(null);
     try {
       const h = JSON.parse(localStorage.getItem('lupus_history')||'[]');
       h.unshift(result);
@@ -6345,6 +6435,33 @@ function App() {
             onViewHistory={()=>setScreen('history')}
             onProfile={()=>setScreen('profile')}
           />
+          {/* Banner rientro NARRATORE — ha la precedenza: senza narratore il tavolo è fermo */}
+          {gmResumeInfo && !rejoinInfo && (
+            <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-3"
+                 style={{background:'linear-gradient(to top, rgba(11,10,20,1) 60%, transparent)'}}>
+              <div className="rounded-2xl px-4 py-4"
+                   style={{background:'rgba(226,201,126,0.12)', border:'1px solid rgba(226,201,126,0.45)',
+                           boxShadow:'0 0 24px rgba(226,201,126,0.15)'}}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">📜</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-bold leading-tight">{t('rejoin.gmInProgress')}</p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      {t('rejoin.gmMatch')} <span className="text-white font-semibold">#{gmResumeInfo.gameId}</span>
+                    </p>
+                  </div>
+                  <button onClick={() => { localStorage.removeItem('lif_gm_session'); setGmResumeInfo(null); }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-colors text-lg leading-none"
+                    style={{background:'rgba(255,255,255,0.07)'}}>✕</button>
+                </div>
+                <button onClick={() => resumeAsNarrator(gmResumeInfo.gameId)}
+                        className="btn-gold w-full py-3 rounded-xl text-sm">
+                  {t('rejoin.gmResume')}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Banner recupero sessione — appare se il giocatore aveva una partita aperta */}
           {rejoinInfo && (
             <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-3"

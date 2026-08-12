@@ -593,6 +593,9 @@ export const IT = {
 
   rejoin: {
     inProgress: 'Partita in corso!',
+    gmInProgress: 'Sei il narratore di una partita in corso',
+    gmMatch: 'Partita',
+    gmResume: '📜 Torna a fare il narratore',
     connectedAs: 'Eri connesso come',
     resume: '↩ Riprendi la partita',
   },
@@ -1189,5 +1192,8 @@ export const EN = {
     inProgress: 'Game in progress!',
     connectedAs: 'You were connected as',
     resume: '↩ Resume the game',
+    gmInProgress: 'You are narrating a game in progress',
+    gmMatch: 'Game',
+    gmResume: '📜 Resume as narrator',
   },
 };
