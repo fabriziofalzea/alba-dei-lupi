@@ -3216,7 +3216,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       [b]: [...new Set([...norm(b), a])],
     };
   }, [lovers]);
-  const [dawnInfo, setDawnInfo] = useState(null); // info GM sull'alba: { victimId, poisonVictimId, stregaHealed, figlioTransformed, mediumResult, sciamanoResult }
+  const [dawnInfo, setDawnInfo] = useState(null); // info GM sull'alba: { victimId, poisonVictimId, stregaHealed, figlioTransformed, mediumResults, sciamanoResult }
 
   // Firebase listener for ready count and night votes
   useEffect(()=>{
@@ -3487,12 +3487,21 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         healers.forEach(vid => fbUpdate({ [`witchPotions/${vid}/heal`]: true }));
       }
 
-      // Medium
-      const mediumDecision = newDecisions['medium'];
-      let mediumResult = null;
-      if(mediumDecision && pStates[mediumDecision] && !pStates[mediumDecision].alive) {
-        const medRole = ROLES[pStates[mediumDecision].role];
-        mediumResult = { name: pStates[mediumDecision].name, role: medRole };
+      // Medium: ognuno consulta il proprio spirito, quindi col Mitomane le visioni
+      // possono essere due e vanno mostrate entrambe al narratore.
+      const mediumByPlayer = Object.keys(newDecisions['mediumByPlayer'] || {}).length
+        ? newDecisions['mediumByPlayer']
+        : (newDecisions['medium'] ? { _single: newDecisions['medium'] } : {});
+      const mediumResults = [];
+      for (const [vid, tgt] of Object.entries(mediumByPlayer)) {
+        const spirit = pStatesRef.current[tgt];
+        if(tgt && spirit && !spirit.alive) {
+          mediumResults.push({
+            medium: pStatesRef.current[vid]?.name || null, // chi ha guardato, se sono più d'uno
+            name: spirit.name,
+            role: ROLES[spirit.role],
+          });
+        }
       }
 
       // Sciamani: ognuno ha la propria resurrezione, per lo stesso motivo delle Streghe
@@ -3574,7 +3583,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         poisonVictimId,
         stregaHealed: stregaUsedHeal && !!newDecisions['lupi'],
         figlioTransformed,
-        mediumResult,
+        mediumResults,
         sciamanoResult,
       };
       setDawnInfo(info);
@@ -3654,7 +3663,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       const voteDetail = Object.entries(dayVotes).map(([voterId, tId]) => ({ voterId, targetId: tId }));
 
       if(target && pStates[target]) {
-         pushEvent({ type: 'day', turn: dayNum, dayVictim: target, noMajority: false, votes: voteDetail, tally });
+         pushEvent({ type: 'day', turn: currentDayNum, dayVictim: target, noMajority: false, votes: voteDetail, tally });
          const w = eliminate(target);
          if(w) return;
          // Frase statica → MP3 pre-registrato, nessuna API call
@@ -3673,7 +3682,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
            window.playSfx('night');
          }, 10000);
       } else {
-         pushEvent({ type: 'day', turn: dayNum, dayVictim: null, noMajority: true, votes: voteDetail, tally });
+         pushEvent({ type: 'day', turn: currentDayNum, dayVictim: null, noMajority: true, votes: voteDetail, tally });
          setNarrationAndPhase('ended_voting',
            t('narration.dayNoMajority'),
            null, { dayVotes: null, dayVictimId: null }, 'day_no_majority'
@@ -3703,9 +3712,14 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const alivePlayers = Object.values(pStates).filter(p=>p.alive);
   const deadPlayers  = Object.values(pStates).filter(p=>!p.alive);
 
+  // dayNum viene incrementato all'ALBA, quindi durante il giorno vale già il numero
+  // della notte successiva: la giornata in corso è quella appena cominciata, cioè una
+  // in meno. Senza questo, la prima giornata si presentava come "Seconda giornata".
+  const currentDayNum = Math.max(1, dayNum - 1);
+
   const phaseLabel = {
     waiting: t('gameMaster.phaseLabelWaiting'), role_reveal: t('gameMaster.phaseLabelRoleReveal'),
-    night: t('gameMaster.phaseLabelNight', {n: dayNum}), day: t('gameMaster.phaseLabelDay', {n: dayNum}),
+    night: t('gameMaster.phaseLabelNight', {n: dayNum}), day: t('gameMaster.phaseLabelDay', {n: currentDayNum}),
     voting: t('gameMaster.phaseLabelVoting'), ended: t('gameMaster.phaseLabelEnded'),
   }[phase]||'';
 
@@ -4325,9 +4339,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
                 {dawnInfo.figlioTransformed && (
                   <p>🐺 <span className="text-gray-400">{t('gameMaster.wolfChildTransformed')}</span></p>
                 )}
-                {dawnInfo.mediumResult && (
-                  <p>👁️ <span className="text-white font-bold">{dawnInfo.mediumResult.name}</span> <span className="text-gray-400">{t('gameMaster.mediumSaw')}</span> <span className="text-white">{dawnInfo.mediumResult.role?.icon} {dawnInfo.mediumResult.role?.name}</span></p>
-                )}
+                {dawnInfo.mediumResults?.map((m, mi) => (
+                  <p key={mi}>👁️ {dawnInfo.mediumResults.length > 1 && m.medium && (
+                    <span className="text-gray-500">{m.medium}: </span>
+                  )}<span className="text-white font-bold">{m.name}</span> <span className="text-gray-400">{t('gameMaster.mediumSaw')}</span> <span className="text-white">{m.role?.icon} {m.role?.name}</span></p>
+                ))}
                 {dawnInfo.sciamanoResult && (
                   <p>🪬 <span className="text-white font-bold">{dawnInfo.sciamanoResult}</span> <span className="text-gray-400">{t('gameMaster.shamanRevived')}</span></p>
                 )}
