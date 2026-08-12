@@ -3289,8 +3289,21 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       if (g.nightDecisions)  setNightDecisions(g.nightDecisions);
       if (g.lovers)          setLovers(g.lovers);
       if (g.mitomaneTarget)  setMitomaneTarget(g.mitomaneTarget);
+      // Fasi transitorie: avanzano solo grazie a un setTimeout in memoria (12s l'alba,
+      // 10s il verdetto) e non hanno né un ramo nel motore né un pulsante nella UI.
+      // Ripristinarle così com'è lascerebbe il narratore su una schermata senza uscita:
+      // si rientra quindi nella fase successiva, quella che il timer avrebbe raggiunto.
+      const FASI_TRANSITORIE = { dawn_reveal: 'day', ended_voting: 'night' };
+      const faseRipristinata = FASI_TRANSITORIE[g.phase] || g.phase;
+      if (faseRipristinata === 'day' && g.phase === 'dawn_reveal') {
+        const secs = (parseInt(localStorage.getItem('lif_day_timer') || '5', 10)) * 60;
+        setTimer(secs); setTimerTotal(secs); setTimerOn(true);
+      }
+      if (faseRipristinata === 'night' && g.phase === 'ended_voting') {
+        setNightStep(0); setNightDecisions({});
+      }
       // La fase per ultima: fa ripartire il motore, e vuole il resto già a posto
-      if (g.phase && g.phase !== 'waiting') setPhase(g.phase);
+      if (faseRipristinata && faseRipristinata !== 'waiting') setPhase(faseRipristinata);
       setRehydrated(true);
     }).catch(() => setRehydrated(true));
   }, [gameId, rehydrated]);
@@ -3816,6 +3829,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
   useEffect(() => {
     if(winner || actionPulse) return;
+    // Finché la reidratazione non ha finito, lo stato è quello iniziale: fase 'waiting'
+    // e tutti vivi. Il listener però popola readyCount subito, e in una partita in corso
+    // tutti risultano pronti — il motore pianificherebbe goFirstNight e 4 secondi dopo
+    // riporterebbe la partita alla notte 1, azzerando le decisioni.
+    if (!rehydrated) return;
 
     let plannedAction = null;
     let delay = 0;
@@ -3865,8 +3883,12 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         }, delay);
       }
     } else {
-      // Se non ci sono azioni pianificate valide ma ne avevamo una (es. un voto è stato revocato?)
-      // Meglio non cancellare per ora, non è un caso supportato
+      // Nessuna azione valida per lo stato attuale: un timer armato per lo stato
+      // PRECEDENTE va disinnescato, altrimenti scatta più tardi su una fase diversa.
+      // È la porta d'ingresso con cui un goFirstNight residuo riportava la partita
+      // alla notte 1 subito dopo il rientro del narratore.
+      clearTimeout(engineTimer.current);
+      scheduledKey.current = null;
     }
   }, [phase, nightStep, readyCount, pStates, nightVotes, dayVotes, activeNightSteps, timer, timerOn, winner, actionPulse]);
 
@@ -4732,7 +4754,12 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
                     setLovers(newLovers);
                     fbUpdate({lovers: newLovers});
                     setShowCupidoModal(null);
-                    // Avanza al prossimo step
+                    // I voti vanno ripuliti PRIMA di riavviare processNightStep: il ramo
+                    // Cupido esce senza avanzare quando trova un id singolo, quindi
+                    // rientrando sugli stessi voti riaprirebbe questa modale all'infinito.
+                    setNightVotes({});
+                    if (db && gameId) db.ref(`games/${gameId}/nightVotes`).remove();
+                    setNightDecisions(prev => ({ ...prev, cupido: `${showCupidoModal},${p.id}` }));
                     setActionPulse('processNightStep');
                   }}
                   className="p-3 rounded-xl text-left flex items-center gap-3 hover:bg-white/10 transition-all"
@@ -5008,6 +5035,7 @@ function PlayerScreen({gameId, playerId}) {
   const [error, setError] = useState(null);
   const [deviceConflict, setDeviceConflict] = useState(false); // token QR di un altro dispositivo
   const [showPack, setShowPack] = useState(false); // elenco lupi scoperto di giorno
+  const [loverDraft, setLoverDraft] = useState(null); // primo innamorato scelto, non ancora confermato
   const [showRoleInfo, setShowRoleInfo] = useState(false);
   const [showRolesInGame, setShowRolesInGame] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -5097,6 +5125,7 @@ function PlayerScreen({gameId, playerId}) {
   // Reset del voto locale quando cambia la fase o il turno
   useEffect(() => {
     setLocalVote(null);
+    setLoverDraft(null); // Cupido agisce ogni notte: la bozza non deve sopravvivere al turno
   }, [phase, gameData?.currentNightStep?.key]);
 
   // Pulisce il rejoin salvato quando la partita termina
@@ -5632,6 +5661,9 @@ function PlayerScreen({gameId, playerId}) {
                 );
               })() : player.role === 'cupido' ? (() => {
               /* ── CUPIDO: sceglie due innamorati dal telefono ── */
+                // La scelta del PRIMO innamorato è una bozza (loverDraft), non un voto:
+                // se usasse localVote, la guardia in cima a castVote respingerebbe la
+                // conferma del secondo e Cupido non riuscirebbe mai a legare nessuno.
                 const submitted = (gameData.nightVotes?.[playerId] || '').includes(',') ||
                                   (localVote || '').includes(',');
                 const savedVote = gameData.nightVotes?.[playerId] || localVote || '';
@@ -5646,8 +5678,7 @@ function PlayerScreen({gameId, playerId}) {
                     </div>
                   );
                 }
-                // localVote senza virgola = primo innamorato scelto localmente (non ancora su FB)
-                const firstPick = localVote && !localVote.includes(',') ? localVote : null;
+                const firstPick = loverDraft;
                 const alivePlayers = Object.entries(gameData.players||{}).filter(([id,p])=>p.alive && id!==playerId);
                 return (
                   <div className="flex flex-col gap-2 mt-2 relative z-50">
@@ -5659,14 +5690,14 @@ function PlayerScreen({gameId, playerId}) {
                         <p className="text-gray-400 text-xs mb-1">{t('player.cupidoChooseSecond')}</p>
                         {alivePlayers.filter(([id])=>id!==firstPick).map(([id,p])=>(
                           <button key={id}
-                            onClick={(e)=>{e.stopPropagation(); castVote(firstPick+','+id);}}
+                            onClick={(e)=>{e.stopPropagation(); setLoverDraft(null); castVote(firstPick+','+id);}}
                             className="w-full p-5 rounded-2xl flex justify-between items-center bg-white/10 touch-manipulation transition-all active:brightness-150 shadow-lg"
                             style={{border:'2px solid rgba(233,30,99,0.5)', pointerEvents:'auto', zIndex:999}}>
                             <span className="font-bold text-white text-2xl pr-4 pointer-events-none">{p.name}</span>
                             <div className="w-10 h-10 rounded-full border-2 border-pink-400/40 pointer-events-none"></div>
                           </button>
                         ))}
-                        <button onClick={(e)=>{e.stopPropagation(); setLocalVote(null);}}
+                        <button onClick={(e)=>{e.stopPropagation(); setLoverDraft(null);}}
                           className="text-xs text-gray-500 mt-1 text-center py-2 touch-manipulation">
                           {t('player.cupidoChangeChoice')}
                         </button>
@@ -5676,7 +5707,7 @@ function PlayerScreen({gameId, playerId}) {
                         <p className="text-gray-400 text-xs mb-1">{t('player.cupidoChooseFirst')}</p>
                         {alivePlayers.map(([id,p])=>(
                           <button key={id}
-                            onClick={(e)=>{e.stopPropagation(); setLocalVote(id);}}
+                            onClick={(e)=>{e.stopPropagation(); setLoverDraft(id);}}
                             className="w-full p-5 rounded-2xl flex justify-between items-center bg-white/10 touch-manipulation transition-all active:brightness-150 shadow-lg"
                             style={{border:'2px solid rgba(233,30,99,0.25)', pointerEvents:'auto', zIndex:999}}>
                             <span className="font-bold text-white text-2xl pr-4 pointer-events-none">{p.name}</span>
