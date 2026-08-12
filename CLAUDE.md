@@ -191,7 +191,7 @@ Traditore nel villaggio. `team: 'villaggio'` (conta come villico nel calcolo vit
 ### Modifiche gameplay
 - **Mitomane**: eredita **subito** ruolo, poteri e squadra dell'imitato (prima era solo un camuffamento per la Veggente — la funzione non era mai stata implementata)
 - **Lupi/Indemoniato si riconoscono**: pannello "Il tuo branco" nella schermata giocatore, lista ricalcolata dal vivo → il Figlio dei Lupi ci entra appena si trasforma
-- **Voto palese/segreto**: toggle a inizio partita (`gameData.publicVote`, default palese). Se palese: nomi dei votanti, conteggio voti ricevuti, elenco di chi non ha ancora votato
+- **Voto palese/segreto**: toggle a inizio partita (`gameData.publicVote`, **default segreto**) con una ⓘ che spiega entrambe le modalità. Se palese: nomi dei votanti, conteggio voti ricevuti (**pesato**, il Sindaco vale 2) ed elenco di chi non ha ancora votato
 - **Nascondi ruolo**: pulsante 🙈 sulla carta girata (`RoleCard` prop `onHide`)
 - **Narratore vota**: il voto c'era già ma era sepolto dietro il FAB "Il mio ruolo" — ora il FAB diventa rosso e pulsa
 - **Log partita**: gli eventi `day` registrano anche `votes` e `tally`, il recap mostra chi ha votato chi
@@ -207,3 +207,39 @@ Traditore nel villaggio. `team: 'villaggio'` (conta come villico nel calcolo vit
 
 ### Scartato consapevolmente
 **Chat fra lupi**: richiederebbe filtro contenuti, segnalazione e blocco utenti (Guideline 1.2) e ribalterebbe la risposta al questionario di classificazione età in scadenza. Il bisogno di coordinamento è coperto dal pannello "Il tuo branco".
+
+---
+
+## Sessione 2026-08-11/12 — code review, bilanciamento, regole
+
+Tutto deployato **solo sul web**. L'app nativa resta a 1.3.1.
+
+### Regole cambiate su richiesta
+- **Mitomane**: diventa il ruolo copiato **a tutti gli effetti** (si sveglia col branco se copia un lupo, compare nella lista lupi). I poteri **si sommano**, non si condividono: due Streghe hanno due cure e due veleni, due Guardie proteggono due bersagli. Ha richiesto di indicizzare le decisioni notturne **per giocatore** (`<step>ByPlayer`) e di rendere per-giocatore pozioni (`witchPotions/<id>`) e resurrezione (`shamanUsedBy/<id>`)
+- **Cupido**: agisce **ogni notte**, i legami **si accumulano** e la morte si propaga **a catena** su tutto il grafo (visita in ampiezza con protezione dai cicli). `lovers` è passato da partner singolo a lista, leggendo ancora il vecchio formato
+- **Vittoria "amore" eliminata**: ogni innamorato vince con la propria squadra. Non funzionava comunque — `checkWin` riceveva `lovers` e non lo guardava
+- **Voto segreto di default**
+- **Il narratore chiama anche i ruoli morti**: `buildNightSteps` non filtra più sui vivi e include `originalRole`, così né la morte né la trasformazione del Figlio dei Lupi trapelano dal silenzio
+
+### Bug trovati dal code-reviewer (tutti chiusi)
+1. **Mitomane che copiava un lupo poteva chiudere la partita alla prima alba** — diventando lupo conta nella parità di `checkWin`: con 7 giocatori e i 2 lupi consigliati dall'app, i lupi vincevano dopo la prima notte. Non si è snaturato il ruolo: il setup avvisa con la condizione **esatta** `2*(lupi+mitomani)+1 >= giocatori`. Un'euristica più grossolana dava 4 falsi allarmi su 28 configurazioni
+2. **`eliminate()` partiva dalla closure di `pStates`** — due morti nello stesso tick (veleno + lupi) si sovrascrivevano e una **resuscitava** nello stato del narratore, con `checkWin` che poteva mancare la vittoria. Ora parte da `pStatesRef`, aggiornato in modo sincrono
+3. **Descrizioni del Mitomane bugiarde** + carta che cambiava ruolo in silenzio → aggiunto avviso di trasformazione
+4. **Conteggio voti senza il peso del Sindaco** → mostrava pareggio mentre l'app bruciava un altro
+5. **Token dispositivo globale** → aprire il link di un'altra partita ti espelleva dalla tua. Ora è per partita
+6. **Elenco lupi visibile di giorno** → ora va scoperto apposta
+7. **Timer del motore non annullato** sull'avanzamento manuale → poteva far saltare del tutto un turno
+8. **Due Medium**: il riepilogo ne mostrava uno solo
+9. **Off-by-one ordinali**: `dayNum` si incrementa all'alba, quindi la prima giornata compariva come "Seconda". Introdotto `currentDayNum`
+
+### Cronaca delle notti
+Pannello nella schermata del narratore con il resoconto notte per notte, per raccontare a voce senza voce AI. Formattazione estratta in `recapEventLines`/`recapVoteGroups`, condivisa col riepilogo finale dei giocatori. ⚠️ Vive in un `ref`: serve `chronicleVersion` per forzare il ridisegno, altrimenti mostra dati vecchi.
+
+### Bilanciamento — dati, non intuizioni
+`simulate_balance.mjs` (nuovo): Monte Carlo che misura le composizioni. Risultato: **un Indemoniato vale circa mezzo lupo**, non uno — stabile al variare della bravura dei villici (0,61-0,63 su 8 giocatori e 2 lupi). Il consigliere lo conta ancora come un lupo intero, quindi è **leggermente allarmista**: ritarabile con i dati già disponibili.
+
+⚠️ **`simulate.js` è obsoleto e dà sicurezza falsa**: duplica la tabella dei ruoli invece di importarla, non conosce Indemoniato, Sciamano né `winsWith`, e contiene ruoli che non esistono più (`lupo_alfa`, `criceto`). Passa 43 test su 43 senza testare l'app di oggi. Va rifatto importando la logica vera, o eliminato.
+
+### Ancora aperto
+- **`checkWin` non implementa nessuna vittoria di terze parti** — oggi non serve più (amore rimossa), ma se si aggiungono ruoli con vittoria propria va rifatta
+- Con più Medium il **riepilogo finale dei giocatori** mostra le visioni, ma la narrazione dell'alba resta sintetica
