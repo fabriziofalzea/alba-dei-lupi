@@ -3261,6 +3261,11 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       });
       setNightVotes(data.nightVotes||{});
       setDayVotes(data.dayVotes||{});
+      // Consumi per giocatore, tenuti allineati con Firebase: il motore li usa per
+      // rifiutare un potere già speso. Prima erano controllati SOLO nella schermata
+      // del giocatore, quindi il narratore che gioca aveva poteri illimitati.
+      if (data.witchPotions) pozioniUsateRef.current  = { ...data.witchPotions };
+      if (data.shamanUsedBy) sciamanoUsatoRef.current = { ...data.shamanUsedBy };
       if(data.lovers) setLovers(data.lovers);
     });
     return ()=>ref.off();
