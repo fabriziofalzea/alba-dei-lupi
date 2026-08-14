@@ -521,6 +521,11 @@ const NIGHT_NARRATION = {
   sciamano: { open: 'Lo Sciamano, apra gli occhi. Puoi richiamare un\'anima perduta — scegli chi riportare tra i vivi.', close: 'Lo Sciamano, chiuda gli occhi.' },
 };
 
+// Tempo massimo di un passo notturno prima che il motore avanzi comunque. Generoso
+// di proposito: se scadesse mentre qualcuno sta ancora scegliendo, il turno andrebbe
+// perso in silenzio — peggio di un'attesa, che almeno il narratore può gestire.
+const NIGHT_STEP_TIMEOUT_MS = 90000;
+
 const NIGHT_STEPS = [
   { key:'open',     label:'Apertura',     icon:'🌙', hasRole:false },
   { key:'cupido',   label:'Cupido',       icon:'💘', hasRole:true,  roleId:'cupido' },
@@ -3968,6 +3973,13 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
             const votersOfRole = Object.keys(nightVotes).filter(vid => pStates[vid]?.role === step.roleId);
             if (votersOfRole.length >= aliveOfRole.length) {
               plannedAction = 'processNightStep'; delay = 3500;
+            } else {
+              // Un giocatore vivo che non tocca lo schermo — distratto, telefono in tasca,
+              // o che non ha capito cosa fare — bloccherebbe il passo per sempre: la
+              // condizione qui sopra non si avvera mai. Il narratore dovrebbe forzare, ma
+              // non può chiedere "hai giocato?" senza far uscire allo scoperto il ruolo.
+              // Si avanza comunque, così la durata del passo non dipende da chi lo interpreta.
+              plannedAction = 'processNightStep'; delay = NIGHT_STEP_TIMEOUT_MS;
             }
           }
         } else {
@@ -3985,7 +3997,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
     }
 
     if (plannedAction) {
-      const currentKey = `${phase}-${nightStep}-${plannedAction}`;
+      // Il delay fa parte della chiave: senza, il timeout lungo armato quando ancora
+      // nessuno aveva votato non verrebbe riprogrammato a 3,5s appena i voti arrivano,
+      // e il passo resterebbe fermo fino alla scadenza pur avendo già tutte le scelte.
+      const currentKey = `${phase}-${nightStep}-${plannedAction}-${delay}`;
       if (scheduledKey.current !== currentKey) {
         scheduledKey.current = currentKey;
         clearTimeout(engineTimer.current);
@@ -5323,6 +5338,21 @@ function PlayerScreen({gameId, playerId}) {
     }
   }, [phase]);
 
+  // Pulsazione a ogni cambio di passo notturno, IDENTICA per tutti e su ogni telefono.
+  // Serve a chi non sta guardando lo schermo: nessuno può dire al narratore "ho giocato"
+  // senza scoprirsi, quindi l'unico modo di richiamare l'attenzione è il telefono.
+  // Deve vibrare a TUTTI, non solo a chi è di turno: al buio un ronzio isolato che arriva
+  // mentre il narratore chiama un ruolo rivelerebbe al tavolo chi lo interpreta.
+  // ⚠️ Su Safari iOS non esiste navigator.vibrate: chi gioca dal QR su iPhone non la sente
+  // (vedi window.haptic). Per questo il timeout del motore resta la vera garanzia.
+  const prevStepRef = useRef(null);
+  useEffect(() => {
+    const chiave = gameData?.currentNightStep?.key;
+    if (phase !== 'night' || !chiave) { prevStepRef.current = null; return; }
+    if (prevStepRef.current && prevStepRef.current !== chiave) window.haptic('medium');
+    prevStepRef.current = chiave;
+  }, [phase, gameData?.currentNightStep?.key]);
+
   if(error) return (
     <div className="min-h-screen layer flex flex-col items-center justify-center p-6 text-center">
       <Moon size={56}/>
@@ -5635,7 +5665,9 @@ function PlayerScreen({gameId, playerId}) {
                                   border:'1px solid rgba(192,57,43,0.45)',
                                   color: w.alive ? '#fff' : 'rgba(255,255,255,0.38)',
                                   textDecoration: w.alive ? 'none' : 'line-through'}}>
-                      {w.name}{wid === playerId ? ` (${t('player.you')})` : ''}
+                      {/* player.you vale già '(tu)' / '(you)': le parentesi qui intorno
+                          producevano "Anna ((tu))". Alla riga ~6100 la chiave è usata nuda. */}
+                      {w.name}{wid === playerId ? ` ${t('player.you')}` : ''}
                     </span>
                   ))}
                 </div>
@@ -5910,11 +5942,39 @@ function PlayerScreen({gameId, playerId}) {
                             pointerEvents: 'auto', position: 'relative', zIndex: 999
                           }}>
                           <span className="font-bold text-white text-2xl pr-4 pointer-events-none">{p.name}{isBlocked ? ' 🚫' : ''}</span>
-                          {isSelected ? <span className="text-4xl pointer-events-none">🔮</span> : <div className="w-10 h-10 rounded-full border-2 border-white/40 pointer-events-none"></div>}
+                          {/* L'icona era 🔮 fissa: un lupo che votava si vedeva confermare
+                              la scelta dalla sfera della Veggente. Ora è la propria. */}
+                          {isSelected ? <span className="text-4xl pointer-events-none">{role?.icon || '✓'}</span> : <div className="w-10 h-10 rounded-full border-2 border-white/40 pointer-events-none"></div>}
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* Conferma esplicita del voto. Strega, Sciamano e Cupido la avevano già;
+                      qui l'unico segnale era il bordo della riga, e chi votava non capiva se
+                      il tap fosse stato registrato. Per i ruoli con più giocatori (i lupi)
+                      mostra anche quanti del gruppo hanno scelto: è informazione che il
+                      branco ha già fra sé, e risolve il "abbiamo votato tutti?". */}
+                  {(() => {
+                    const mioVoto = localVote || gameData.nightVotes?.[playerId];
+                    const nomeScelto = mioVoto && gameData.players?.[mioVoto]?.name;
+                    if (!nomeScelto) return null;
+                    const delMioRuolo = Object.entries(gameData.players || {})
+                      .filter(([, p]) => p.alive && p.role === player.role);
+                    const hannoScelto = delMioRuolo
+                      .filter(([vid]) => (gameData.nightVotes || {})[vid]).length;
+                    return (
+                      <div className="mt-4 p-3 rounded-2xl text-center anim-fade-in"
+                           style={{background:'rgba(74,222,128,0.12)', border:'1px solid rgba(74,222,128,0.4)'}}>
+                        <p className="text-white text-sm font-bold">{t('player.voteRegistered', {name: nomeScelto})}</p>
+                        <p className="text-gray-400 text-xs mt-1">
+                          {delMioRuolo.length > 1
+                            ? t('player.voteGroupProgress', {done: hannoScelto, total: delMioRuolo.length})
+                            : t('player.shamanWaitingAdvance')}
+                        </p>
+                      </div>
+                    );
+                  })()}
 
                   {/* ── VEGGENTE: rivela l'allineamento dopo il voto ── */}
                   {player.role === 'veggente' && localVote && (() => {
@@ -6636,7 +6696,12 @@ function App() {
             onProfile={()=>setScreen('profile')}
           />
           {/* Banner rientro NARRATORE — ha la precedenza: senza narratore il tavolo è fermo */}
-          {gmResumeInfo && !rejoinInfo && (
+          {/* Il narratore ha la precedenza sul rientro da giocatore. Prima era il
+              contrario e la sessione giocatore nascondeva del tutto questo banner: chi
+              aveva giocato una partita precedente sullo stesso telefono, e poi ospitava,
+              si ritrovava nella schermata del vecchio giocatore. Senza narratore il
+              tavolo è bloccato; un giocatore invece può sempre rifare il QR. */}
+          {gmResumeInfo && (
             <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-3"
                  style={{background:'linear-gradient(to top, rgba(11,10,20,1) 60%, transparent)'}}>
               <div className="rounded-2xl px-4 py-4"
@@ -6663,7 +6728,7 @@ function App() {
           )}
 
           {/* Banner recupero sessione — appare se il giocatore aveva una partita aperta */}
-          {rejoinInfo && (
+          {rejoinInfo && !gmResumeInfo && (
             <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-3"
                  style={{background:'linear-gradient(to top, rgba(11,10,20,1) 60%, transparent)'}}>
               <div className="rounded-2xl px-4 py-4"
