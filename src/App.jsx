@@ -3655,9 +3655,17 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
 
       // Streghe: ognuna ha le SUE pozioni (il Mitomane si somma, non le condivide),
       // quindi nella stessa notte possono esserci più cure e più veleni.
+      // Come per lo Sciamano: la chiave fittizia '_single' faceva saltare la scrittura
+      // del flag "pozione consumata", perché più sotto era protetta da vid !== '_single'.
+      // Con una sola Strega la cura e il veleno tornavano disponibili ogni notte.
       const stregaByPlayer = Object.keys(newDecisions['stregaByPlayer'] || {}).length
         ? newDecisions['stregaByPlayer']
-        : (newDecisions['strega'] ? { _single: newDecisions['strega'] } : {});
+        : (() => {
+            if (!newDecisions['strega']) return {};
+            const wid = Object.keys(pStatesRef.current)
+              .find(pid => pStatesRef.current[pid]?.role === 'strega');
+            return wid ? { [wid]: newDecisions['strega'] } : {};
+          })();
       // Il consumo delle pozioni va verificato QUI, non nella UI: la scheda del
       // narratore-giocatore è una seconda interfaccia che non conosce quei vincoli,
       // e senza questo controllo un narratore-Strega curerebbe e avvelenerebbe ogni notte.
@@ -3674,10 +3682,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       const stregaUsedPoison = poisoners.length > 0;
       if(stregaUsedHeal && dawnVictim) {
         dawnVictim = null;
-        healers.forEach(vid => { if (vid !== '_single') {
+        healers.forEach(vid => {
           pozioniUsateRef.current[vid] = { ...(pozioniUsateRef.current[vid]||{}), heal:true };
           fbUpdate({ [`witchPotions/${vid}/heal`]: true });
-        }});
+        });
       }
 
       // Medium: ognuno consulta il proprio spirito, quindi col Mitomane le visioni
@@ -3698,9 +3706,18 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       }
 
       // Sciamani: ognuno ha la propria resurrezione, per lo stesso motivo delle Streghe
+      // Il ripiego usava la chiave fittizia '_single', ma il flag "potere usato" veniva
+      // scritto solo per chiavi diverse da '_single': con un solo Sciamano non finiva
+      // né nel ref né su Firebase, e la notte dopo l'app gli riproponeva l'elenco dei
+      // morti come se potesse ancora resuscitare. Si risale invece al suo vero id.
       const sciamanoByPlayer = Object.keys(newDecisions['sciamanoByPlayer'] || {}).length
         ? newDecisions['sciamanoByPlayer']
-        : (newDecisions['sciamano'] ? { _single: newDecisions['sciamano'] } : {});
+        : (() => {
+            if (!newDecisions['sciamano']) return {};
+            const sid = Object.keys(pStatesRef.current)
+              .find(pid => pStatesRef.current[pid]?.role === 'sciamano');
+            return sid ? { [sid]: newDecisions['sciamano'] } : {};
+          })();
       let sciamanoResult = null;
       let sciamanoRevivedId = null;
       for (const [vid, tgt] of Object.entries(sciamanoByPlayer)) {
@@ -3710,10 +3727,10 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
           pStatesRef.current = risorto;
           setPStates(risorto);
           if(db && gameId) db.ref(`games/${gameId}/players/${tgt}/alive`).set(true);
-          if (vid !== '_single') {
-            sciamanoUsatoRef.current[vid] = true;
-            fbUpdate({ [`shamanUsedBy/${vid}`]: true });
-          }
+          // Sempre, non più solo per i multi-Sciamano: è questo flag che di notte
+          // fa sparire l'elenco dei morti e lascia il solo pulsante per avanzare.
+          sciamanoUsatoRef.current[vid] = true;
+          fbUpdate({ [`shamanUsedBy/${vid}`]: true });
           if(!sciamanoResult) { sciamanoResult = risorto[tgt].name; sciamanoRevivedId = tgt; }
         }
       }
@@ -3731,10 +3748,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       for (const [vid, tgt] of poisoners) {
         if(pStatesRef.current[tgt]?.alive) {
           if(!poisonVictimId) poisonVictimId = tgt; // il primo alimenta narrazione e recap
-          if (vid !== '_single') {
-            pozioniUsateRef.current[vid] = { ...(pozioniUsateRef.current[vid]||{}), poison:true };
-            fbUpdate({ [`witchPotions/${vid}/poison`]: true });
-          }
+          pozioniUsateRef.current[vid] = { ...(pozioniUsateRef.current[vid]||{}), poison:true };
+          fbUpdate({ [`witchPotions/${vid}/poison`]: true });
           if (eliminate(tgt, true)) partitaFinita = true;
         }
       }
@@ -5974,7 +5989,14 @@ function PlayerScreen({gameId, playerId}) {
               })() : player.role === 'sciamano' ? (() => {
               /* ── SCIAMANO: resuscita un morto (una volta per partita) ── */
                 // Per giocatore: due Sciamani (Mitomane) hanno una resurrezione a testa
-                const shamanUsed = gameData.shamanUsedBy?.[playerId] ?? (gameData.shamanUsed || false);
+                // Il solo flag non basta: se per qualsiasi motivo non viene scritto,
+                // la notte dopo ricompare l'elenco dei morti e il giocatore tocca a
+                // vuoto (il motore la resurrezione la blocca comunque). Con un unico
+                // Sciamano la cronaca è una seconda prova indipendente.
+                const sciamaniInGioco = Object.values(gameData.players||{}).filter(p=>p.role==='sciamano').length;
+                const usatoDaCronaca = sciamaniInGioco === 1 &&
+                  (gameData.narratorLog || []).some(e => e.type === 'night' && e.sciamanoRevived);
+                const shamanUsed = (gameData.shamanUsedBy?.[playerId] ?? (gameData.shamanUsed || false)) || usatoDaCronaca;
                 const deadPlayers = Object.entries(gameData.players||{}).filter(([id,p])=>!p.alive);
                 const voted = localVote || gameData.nightVotes?.[playerId];
 
