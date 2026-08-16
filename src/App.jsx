@@ -679,7 +679,21 @@ function recapEventLines(ev, players) {
     }
     if (ev.stregaPoison)      lines.push(t('player.witchPoisonedLog', {target: `${pName(ev.stregaPoison)} (${pRole(ev.stregaPoison)})`}));
     if (ev.sciamanoRevived)   lines.push(t('player.shamanRevivedLog', {name: pName(ev.sciamanoRevived)}));
-    if (ev.cupidoLovers?.length === 2) lines.push(t('player.cupidoBoundLog', {name1: pName(ev.cupidoLovers[0]), name2: pName(ev.cupidoLovers[1])}));
+    // Tutte le coppie della notte; si ricade su cupidoLovers per le partite registrate
+    // prima che venisse salvato l'elenco completo.
+    const coppieCupido = ev.cupidoPairs?.length ? ev.cupidoPairs
+                        : (ev.cupidoLovers?.length === 2 ? [ev.cupidoLovers] : []);
+    coppieCupido.forEach(([a, b]) => lines.push(t('player.cupidoBoundLog', {name1: pName(a), name2: pName(b)})));
+    if (ev.veggenteScans?.length) {
+      lines.push(t('player.veggenteScannedLog', {
+        targets: ev.veggenteScans.map(id => `${pName(id)} (${pRole(id)})`).join(joiner)
+      }));
+    }
+    if (ev.mediumScans?.length) {
+      lines.push(t('player.mediumScannedLog', {
+        targets: ev.mediumScans.map(id => `${pName(id)} (${pRole(id)})`).join(joiner)
+      }));
+    }
     if (ev.mitomaneTarget)    lines.push(t('player.mitomaneChoseLog', {target: `${pName(ev.mitomaneTarget)} (${pRole(ev.mitomaneTarget)})`}));
     if (ev.loveVictims?.length) {
       lines.push(t('player.loveVictimsLog', {
@@ -3525,11 +3539,16 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       if (step.key === 'cupido' && target) {
         const coppie = Object.values(perPlayer).filter(v => typeof v === 'string' && v.includes(','));
         if (coppie.length) {
-          let newLovers = {};
+          // I legami si ACCUMULANO invece di sovrascriversi: con due Cupidi che
+          // scelgono coppie che condividono una persona (A-B e B-C), lo spread
+          // sostituiva la voce di B e restava legato solo a C — con A che lo
+          // credeva ancora suo partner. Grafo asimmetrico, morti sbagliate.
+          const newLovers = {};
+          const lega = (a, b) => { newLovers[a] = [...new Set([...(newLovers[a] || []), b])]; };
           coppie.forEach(v => {
             const [l1, l2] = v.split(',');
             if (l1 && l2 && pStates[l1] && pStates[l2] && l1 !== l2) {
-              newLovers = { ...newLovers, ...linkLovers(l1, l2) };
+              lega(l1, l2); lega(l2, l1);
             }
           });
           if (Object.keys(newLovers).length) {
@@ -3766,6 +3785,15 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         sciamanoRevived:    sciamanoRevivedId,
         // La coppia legata QUESTA notte: Cupido agisce ogni notte, non solo la prima
         cupidoLovers:       newDecisions['cupido']?.includes(',') ? newDecisions['cupido'].split(',') : null,
+        // TUTTE le coppie: col Mitomane i Cupidi possono essere due e la cronaca ne
+        // registrava una sola, facendo sparire dal racconto un legame che però uccide.
+        cupidoPairs:        Object.values(newDecisions['cupidoByPlayer'] || {})
+                              .filter(v => typeof v === 'string' && v.includes(','))
+                              .map(v => v.split(',')),
+        // Veggente e Medium non finivano in cronaca: il narratore non poteva raccontare
+        // le indagini, e a fine partita mancava metà di quello che era successo.
+        veggenteScans:      Object.values(newDecisions['veggenteByPlayer'] || {}).filter(Boolean),
+        mediumScans:        Object.values(newDecisions['mediumByPlayer'] || {}).filter(v => v && v !== 'PASS'),
         mitomaneTarget:     dayNum === 1 && mitomaneTarget ? mitomaneTarget : null,
         // Chi è morto di dolore stanotte, seguendo il partner legato da Cupido:
         // senza questo il narratore non saprebbe di doverlo nominare
@@ -3793,20 +3821,35 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       setLastGuardedId(guardiaChoice);
       if(db && gameId) fbUpdate({ lastGuardedId: guardiaChoice });
 
+      // TUTTI i caduti della notte, non solo la vittima dei lupi: con il veleno della
+      // Strega e la morte per dolore i telefoni ne mostravano uno solo e gli altri
+      // sparivano, lasciando il tavolo a chiedersi chi fosse ancora vivo.
+      const mortiStanotte = [...new Set([
+        (dawnVictim && pStates[dawnVictim]) ? dawnVictim : null,
+        poisonVictimId,
+        ...(loveVictimsRef.current || []),
+      ].filter(Boolean))];
+
       setNarrationAndPhase('dawn_reveal', narr, null, {
         currentNightStep: null,
         nightVotes: null,
         currentNightVictim: null,
-        dawnVictimId: dawnVictim || poisonVictimId || null,
+        dawnVictimId:  mortiStanotte[0] || null,   // compatibilità con le partite in corso
+        dawnVictimIds: mortiStanotte.length ? mortiStanotte : null,
+        dawnRevivedId: sciamanoRevivedId || null,  // la resurrezione va annunciata all'alba
       }, narrKey);
       setDayNum(d=>d+1);
       window.stopSfx('night');
       window.playSfx('dawn');
 
+      // Quando la notte ha lasciato dei morti (o restituito un vivo) l'alba dura di
+      // più: 12 secondi non bastavano a leggere i nomi e a lasciare reagire il tavolo.
+      // dawnInfo NON viene azzerato: il narratore deve poterlo rileggere di giorno.
+      const albaLunga = mortiStanotte.length > 0 || !!sciamanoRevivedId;
       phaseTimer.current = setTimeout(() => {
-        setNarrationAndPhase('day', '', dayTimerMinsRef.current * 60, { dawnVictimId: null });
-        setDawnInfo(null);
-      }, 12000);
+        setNarrationAndPhase('day', '', dayTimerMinsRef.current * 60,
+          { dawnVictimId: null, dawnVictimIds: null, dawnRevivedId: null });
+      }, albaLunga ? 22000 : 12000);
       }; // fine proceedToDawn
 
       // Riproduci il close dell'ultimo step (es. "I Lupi, chiudano gli occhi.")
@@ -4584,6 +4627,29 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         {/* ===================== DAY ===================== */}
         {phase==='day' && (
           <div className="anim-fade-up">
+
+            {/* Riepilogo della notte appena passata: dawnInfo non viene più azzerato al
+                passaggio al giorno, così il narratore può ancora raccontare o rispondere
+                a "chi è morto?" senza riaprire la cronaca. */}
+            {dawnInfo && (dawnInfo.victimId || dawnInfo.poisonVictimId || dawnInfo.loveVictims?.length || dawnInfo.sciamanoResult) && (
+              <div className="glass rounded-2xl p-4 mb-4 flex flex-col gap-1.5 text-sm">
+                <p className="text-gray-600 text-[10px] font-bold uppercase tracking-widest mb-1">{t('gameMaster.phaseDawn')}</p>
+                {dawnInfo.victimId && (
+                  <p>🐺 <span className="text-white font-bold">{pStates[dawnInfo.victimId]?.name}</span> <span className="text-gray-400">{t('gameMaster.killedByWolves')}</span></p>
+                )}
+                {dawnInfo.poisonVictimId && (
+                  <p>☠️ <span className="text-white font-bold">{pStates[dawnInfo.poisonVictimId]?.name}</span> <span className="text-gray-400">{t('gameMaster.poisonedByWitch')}</span></p>
+                )}
+                {dawnInfo.loveVictims?.length > 0 && (
+                  <p>💔 <span className="text-white font-bold">
+                    {dawnInfo.loveVictims.map(id => pStates[id]?.name).filter(Boolean).join(getLang()==='en'?' and ':' e ')}
+                  </span> <span className="text-gray-400">{t('gameMaster.diedOfGrief')}</span></p>
+                )}
+                {dawnInfo.sciamanoResult && (
+                  <p>🪬 <span className="text-white font-bold">{dawnInfo.sciamanoResult}</span> <span className="text-gray-400">{t('gameMaster.shamanRevived')}</span></p>
+                )}
+              </div>
+            )}
 
             {/* Sollecito votazione */}
             {votePrompt && (
@@ -5514,28 +5580,68 @@ function PlayerScreen({gameId, playerId}) {
 
       {/* ══ ALBA — reveal della vittima notturna sui telefoni ══ */}
       {phase === 'dawn_reveal' && (() => {
-        const victimId   = gameData?.dawnVictimId;
-        const victimName = victimId ? (gameData.players?.[victimId]?.name || '???') : null;
-        const isMe       = victimId === playerId;
-        if (!victimName) return null; // nessuna vittima — UI normale
-        if (isMe) return (
+        // Elenco completo dei caduti: prima si leggeva il solo dawnVictimId e con più
+        // morti nella stessa notte (veleno, morte per dolore) gli altri sparivano.
+        const caduti   = gameData?.dawnVictimIds?.length
+                       ? gameData.dawnVictimIds
+                       : (gameData?.dawnVictimId ? [gameData.dawnVictimId] : []);
+        const resuscitatoId = gameData?.dawnRevivedId || null;
+        const nome = id => gameData.players?.[id]?.name || '???';
+        const ruolo = id => ROLES[gameData.players?.[id]?.role];
+        const sonoIo = caduti.includes(playerId);
+        if (!caduti.length && !resuscitatoId) return null; // notte senza sangue — UI normale
+
+        const bloccoResurrezione = resuscitatoId && (
+          <div className="mt-6 pt-5" style={{borderTop:'1px solid rgba(255,255,255,0.12)'}}>
+            <p className="text-5xl mb-2">🪬</p>
+            <p className="text-cyan-300 text-sm uppercase tracking-widest mb-1">{t('player.revivedAtDawn')}</p>
+            <p className="font-cinzel text-white text-2xl font-bold">{nome(resuscitatoId)}</p>
+          </div>
+        );
+
+        if (sonoIo) return (
           <div className="text-center py-10 anim-fade-up">
             <div className="text-8xl mb-4" style={{filter:'drop-shadow(0 0 30px rgba(220,38,38,0.8))'}}>💀</div>
             <p className="font-cinzel text-red-400 text-2xl font-bold mb-2 tracking-wide">{t('player.youEliminated')}</p>
             <p className="font-cinzel text-white text-3xl font-bold mb-3">{player.name}</p>
             <p className="text-gray-500 text-sm italic">{t('player.wolvesGotYou')}</p>
+            {caduti.length > 1 && (
+              <p className="text-gray-400 text-sm mt-4">
+                {t('player.fellWithYou', {names: caduti.filter(id=>id!==playerId).map(nome).join(getLang()==='en'?' and ':' e ')})}
+              </p>
+            )}
             <p className="text-gray-700 text-xs mt-4">{t('player.putPhoneAway')}</p>
+            {bloccoResurrezione}
           </div>
         );
+
         return (
           <div className="text-center py-10 anim-fade-up">
             <div className="text-7xl mb-4" style={{filter:'drop-shadow(0 0 20px rgba(220,38,38,0.5))'}}>🌅</div>
-            <p className="text-gray-400 text-sm mb-2 uppercase tracking-widest">{t('player.fallenTonight')}</p>
-            <p className="font-cinzel text-white text-4xl font-bold mb-3"
-               style={{textShadow:'0 0 20px rgba(220,38,38,0.6)'}}>
-              {victimName}
-            </p>
-            <p className="text-gray-500 text-sm italic">{t('player.wolvesStruck')}</p>
+            {caduti.length > 0 && (
+              <>
+                <p className="text-gray-400 text-sm mb-3 uppercase tracking-widest">
+                  {caduti.length > 1 ? t('player.fallenTonightPlural', {n: caduti.length}) : t('player.fallenTonight')}
+                </p>
+                {/* Un blocco per ciascun caduto, col ruolo scoperto: il tavolo deve
+                    capire subito chi non c'è più e cosa ha perso il villaggio. */}
+                {caduti.map(id => (
+                  <div key={id} className="mb-4">
+                    <p className="font-cinzel text-white text-4xl font-bold"
+                       style={{textShadow:'0 0 20px rgba(220,38,38,0.6)'}}>
+                      {nome(id)}
+                    </p>
+                    {ruolo(id) && (
+                      <p className="text-sm mt-1" style={{color: ruolo(id).color}}>
+                        {ruolo(id).icon} {ruolo(id).name}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                <p className="text-gray-500 text-sm italic">{t('player.wolvesStruck')}</p>
+              </>
+            )}
+            {bloccoResurrezione}
           </div>
         );
       })()}
@@ -5632,7 +5738,17 @@ function PlayerScreen({gameId, playerId}) {
             // nel branco appena si trasforma, e i lupi morti restano visibili barrati.
             const wolves = Object.entries(gameData.players || {})
               .filter(([, p]) => ROLES[p.role]?.team === 'lupi');
-            if (!wolves.length) return null;
+            // L'Indemoniato ha team 'villaggio' (serve perché la Veggente lo veda
+            // innocente), quindi non finiva in questa lista nemmeno per sé stesso: col
+            // Mitomane possono essere due e si votavano a vicenda credendosi villici.
+            // Restano visibili SOLO fra loro: i lupi non devono sapere chi è il proprio
+            // informatore, è ciò che tiene il ruolo a mezzo lupo di valore.
+            const iAmMinion = player.role === 'indemoniato';
+            const minions = iAmMinion
+              ? Object.entries(gameData.players || {}).filter(([, p]) => p.role === 'indemoniato')
+              : [];
+            const allies = [...wolves, ...minions];
+            if (!allies.length) return null;
             // Di giorno e in votazione i telefoni sono esposti agli sguardi dei vicini:
             // l'elenco resta accessibile ma va scoperto apposta.
             const daylight = phase === 'day' || phase === 'voting';
@@ -5659,17 +5775,20 @@ function PlayerScreen({gameId, playerId}) {
                   )}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {wolves.map(([wid, w]) => (
+                  {allies.map(([wid, w]) => {
+                    const eIndemoniato = w.role === 'indemoniato';
+                    return (
                     <span key={wid} className="text-xs font-bold px-2.5 py-1 rounded-full"
-                          style={{background: w.alive ? 'rgba(192,57,43,0.28)' : 'rgba(255,255,255,0.05)',
-                                  border:'1px solid rgba(192,57,43,0.45)',
+                          style={{background: w.alive ? (eIndemoniato ? 'rgba(139,92,246,0.28)' : 'rgba(192,57,43,0.28)') : 'rgba(255,255,255,0.05)',
+                                  border:`1px solid ${eIndemoniato ? 'rgba(139,92,246,0.45)' : 'rgba(192,57,43,0.45)'}`,
                                   color: w.alive ? '#fff' : 'rgba(255,255,255,0.38)',
                                   textDecoration: w.alive ? 'none' : 'line-through'}}>
                       {/* player.you vale già '(tu)' / '(you)': le parentesi qui intorno
                           producevano "Anna ((tu))". Alla riga ~6100 la chiave è usata nuda. */}
-                      {w.name}{wid === playerId ? ` ${t('player.you')}` : ''}
+                      {eIndemoniato ? '😈 ' : ''}{w.name}{wid === playerId ? ` ${t('player.you')}` : ''}
                     </span>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -5765,14 +5884,57 @@ function PlayerScreen({gameId, playerId}) {
                 );
               })() : (
                 /* ── MEDIUM: vota tra i giocatori eliminati ── */
-              player.role === 'medium' ? (
+              player.role === 'medium' ? (() => {
+                const mortiOra = Object.entries(gameData.players||{}).filter(([,p])=>!p.alive);
+                const scelto   = localVote || gameData.nightVotes?.[playerId];
+
+                // Prima notte, o comunque nessun morto: qui c'era solo una frase e
+                // nessun pulsante, quindi il passo non riceveva mai un voto e restava
+                // appeso. Serve un modo esplicito di dire "ho finito".
+                if (mortiOra.length === 0) {
+                  return (
+                    <div className="text-center py-4 mt-2">
+                      <p className="text-3xl mb-2">👁️</p>
+                      <p className="text-gray-400 text-sm mb-4">{t('player.mediumNoneEliminated')}</p>
+                      {scelto !== 'PASS' ? (
+                        <button onClick={(e)=>{e.stopPropagation(); castVote('PASS');}}
+                          className="w-full py-4 rounded-2xl font-bold text-sm transition-all active:scale-95 touch-manipulation"
+                          style={{background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.35)', color:'#c4b5fd', pointerEvents:'auto', zIndex:999}}>
+                          {t('player.shamanPassTurn')}
+                        </button>
+                      ) : (
+                        <p className="text-gray-600 text-xs">{t('player.shamanWaitingAdvance')}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Il risultato dell'indagine compariva SOLO sullo schermo del narratore:
+                // il Medium usava il potere e non scopriva nulla dal proprio telefono.
+                if (scelto && scelto !== 'PASS') {
+                  const rs = ROLES[gameData.players?.[scelto]?.role];
+                  const eLupo = rs?.team === 'lupi';
+                  return (
+                    <div className="mt-2 p-4 rounded-2xl text-center anim-fade-in"
+                         style={{background: eLupo ? 'rgba(139,26,26,0.35)' : 'rgba(26,74,26,0.35)',
+                                 border: `2px solid ${eLupo ? 'rgba(239,68,68,0.6)' : 'rgba(74,222,128,0.6)'}`}}>
+                      <p className="text-4xl mb-1">{rs?.icon || '👁️'}</p>
+                      <p className="font-cinzel text-white font-bold text-lg">
+                        {gameData.players?.[scelto]?.name} {t('gameMaster.mediumSaw')} {rs?.name || '???'}
+                      </p>
+                      <p className={`text-sm font-bold mt-1 ${eLupo ? 'text-red-300' : 'text-green-300'}`}>
+                        {eLupo ? t('player.veggenteIsWolf') : t('player.veggenteIsInnocent')}
+                      </p>
+                      <p className="text-gray-400 text-xs mt-2">{t('player.veggenteOnlyYouSee')}</p>
+                    </div>
+                  );
+                }
+
+                return (
                 <>
                   <p className="text-gray-400 text-xs mb-3 mt-1">{t('player.mediumChooseSpirit')}</p>
                   <div className="flex flex-col gap-3 relative z-50">
-                    {Object.entries(gameData.players||{}).filter(([id,p])=>!p.alive).length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-3">{t('player.mediumNoneEliminated')}</p>
-                    )}
-                    {Object.entries(gameData.players||{}).filter(([id,p])=>!p.alive).map(([id,p])=>{
+                    {mortiOra.map(([id,p])=>{
                       const isSel = localVote===id || (gameData.nightVotes?.[playerId]===id);
                       return (
                         <button key={id}
@@ -5788,7 +5950,8 @@ function PlayerScreen({gameId, playerId}) {
                     })}
                   </div>
                 </>
-              ) : player.role === 'sciamano' ? (() => {
+                );
+              })() : player.role === 'sciamano' ? (() => {
               /* ── SCIAMANO: resuscita un morto (una volta per partita) ── */
                 // Per giocatore: due Sciamani (Mitomane) hanno una resurrezione a testa
                 const shamanUsed = gameData.shamanUsedBy?.[playerId] ?? (gameData.shamanUsed || false);
@@ -6228,7 +6391,10 @@ function PlayerScreen({gameId, playerId}) {
               const allPlayers = Object.entries(gameData.players || {});
               const alivePlayers = allPlayers.filter(([,p]) => p.alive !== false);
               const deadPlayers  = allPlayers.filter(([,p]) => p.alive === false);
-              const roleIds = [...new Set(alivePlayers.map(([,p])=>p.role))];
+              // Da TUTTI i giocatori, non solo dai vivi: quando l'ultimo di un ruolo
+              // moriva, il ruolo spariva dall'elenco con la sua descrizione, proprio
+              // quando serve per capire cosa è appena successo al tavolo.
+              const roleIds = [...new Set(allPlayers.map(([,p])=>p.role))];
               return (
                 <>
                   {roleIds.map(rid=>{
@@ -6260,13 +6426,18 @@ function PlayerScreen({gameId, playerId}) {
                     <div className="mt-4">
                       <p className="text-gray-600 text-[10px] font-bold uppercase tracking-widest mb-2 px-1">{t('gameMaster.eliminated')}</p>
                       <div className="flex flex-wrap gap-2">
-                        {deadPlayers.map(([id, p]) => (
-                          <span key={id}
-                                className="text-gray-500 text-xs px-3 py-1 rounded-full"
-                                style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)'}}>
-                            {p.name}
-                          </span>
-                        ))}
+                        {/* Il ruolo di chi è morto è già pubblico (compare nella cronaca
+                            e all'alba): mostrarlo qui evita di dover rileggere il log. */}
+                        {deadPlayers.map(([id, p]) => {
+                          const dr = ROLES[p.role];
+                          return (
+                            <span key={id}
+                                  className="text-gray-500 text-xs px-3 py-1 rounded-full"
+                                  style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)'}}>
+                              {p.name}{dr ? ` · ${dr.icon} ${dr.name}` : ''}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
