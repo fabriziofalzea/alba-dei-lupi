@@ -3830,12 +3830,20 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
         ...(loveVictimsRef.current || []),
       ].filter(Boolean))];
 
+      // Causa per ciascun caduto: sotto l'elenco c'era una frase fissa "I lupi hanno
+      // colpito" anche quando qualcuno era morto di veleno o di dolore.
+      const causeMorte = {};
+      if (dawnVictim && pStates[dawnVictim]) causeMorte[dawnVictim] = 'lupi';
+      if (poisonVictimId) causeMorte[poisonVictimId] = 'veleno';
+      (loveVictimsRef.current || []).forEach(id => { causeMorte[id] = 'amore'; });
+
       setNarrationAndPhase('dawn_reveal', narr, null, {
         currentNightStep: null,
         nightVotes: null,
         currentNightVictim: null,
         dawnVictimId:  mortiStanotte[0] || null,   // compatibilità con le partite in corso
         dawnVictimIds: mortiStanotte.length ? mortiStanotte : null,
+        dawnCauses:    Object.keys(causeMorte).length ? causeMorte : null,
         dawnRevivedId: sciamanoRevivedId || null,  // la resurrezione va annunciata all'alba
       }, narrKey);
       setDayNum(d=>d+1);
@@ -5625,7 +5633,9 @@ function PlayerScreen({gameId, playerId}) {
                 </p>
                 {/* Un blocco per ciascun caduto, col ruolo scoperto: il tavolo deve
                     capire subito chi non c'è più e cosa ha perso il villaggio. */}
-                {caduti.map(id => (
+                {caduti.map(id => {
+                  const causa = gameData?.dawnCauses?.[id];
+                  return (
                   <div key={id} className="mb-4">
                     <p className="font-cinzel text-white text-4xl font-bold"
                        style={{textShadow:'0 0 20px rgba(220,38,38,0.6)'}}>
@@ -5636,9 +5646,19 @@ function PlayerScreen({gameId, playerId}) {
                         {ruolo(id).icon} {ruolo(id).name}
                       </p>
                     )}
+                    {/* La causa per ciascuno: prima una frase unica diceva "i lupi hanno
+                        colpito" anche per chi era morto di veleno o di dolore. */}
+                    {causa && (
+                      <p className="text-gray-500 text-xs italic mt-0.5">
+                        {causa === 'veleno' ? t('player.causePoison')
+                         : causa === 'amore' ? t('player.causeGrief')
+                         : t('player.causeWolves')}
+                      </p>
+                    )}
                   </div>
-                ))}
-                <p className="text-gray-500 text-sm italic">{t('player.wolvesStruck')}</p>
+                  );
+                })}
+                {!gameData?.dawnCauses && <p className="text-gray-500 text-sm italic">{t('player.wolvesStruck')}</p>}
               </>
             )}
             {bloccoResurrezione}
