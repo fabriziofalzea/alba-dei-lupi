@@ -23,7 +23,7 @@ const FILES = [
     text: 'Night falls over the village. Silence swallows every sound, every movement.' },
 
   { file: 'cupido_open.mp3',
-    text: 'Cupid, open your eyes. Choose the two hearts that will beat as one — your arrow will decide their fate forever.' },
+    text: 'Cupid, open your eyes. Choose the two hearts that will beat as one — your arrow binds their fate until dawn.' },
   { file: 'cupido_close.mp3',
     text: 'Cupid, close your eyes.' },
 

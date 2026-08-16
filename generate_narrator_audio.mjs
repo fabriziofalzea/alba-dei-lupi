@@ -26,7 +26,7 @@ const FILES = [
 
   // Cupido
   { file: 'cupido_open.mp3',
-    text: "Cupido, apra gli occhi. Scegli i due cuori che batteranno all'unisono — la tua freccia deciderà il loro destino per sempre." },
+    text: "Cupido, apra gli occhi. Scegli i due cuori che batteranno all'unisono — la tua freccia lega il loro destino fino all'alba." },
   { file: 'cupido_close.mp3',
     text: 'Cupido, chiuda gli occhi.' },
 
