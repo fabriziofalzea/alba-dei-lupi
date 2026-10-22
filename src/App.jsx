@@ -8,7 +8,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import 'firebase/compat/auth';
 import 'firebase/compat/analytics';
-import { trackEvent } from './lib/analytics';
+import { trackEvent, initAnalytics } from './lib/analytics';
 
 // Riassegna per i riferimenti globali
 window.firebase = firebase;
@@ -742,6 +742,7 @@ function initFirebase() {
   } catch(e) { console.warn('Firebase init error:', e); }
 }
 initFirebase();
+initAnalytics();
 
 /* ── Safe Area iOS: CSS env() diretto, nessun JS timing issue ── */
 // Segnale globale: siamo in app nativa Capacitor?
@@ -1800,6 +1801,54 @@ const AVATAR_HEROES = [
   { id:'villico', url:'/avatars/villico.png' },
   { id:'sciamano', url:'/avatars/sciamano.png' },
 ];
+/* ================================================================
+   TEMA STAGIONALE — pilotato da Firebase `config/seasonal`
+   Esempio: { id:'halloween', from:'2026-10-28', to:'2026-11-02' }
+   Si accende e si spegne senza pubblicare una nuova versione.
+   ================================================================ */
+const SEASONAL_THEMES = {
+  halloween: {
+    sigils: [
+      { id:'pumpkin', icon:'🎃' },
+      { id:'web',     icon:'🕸️' },
+      { id:'bat',     icon:'🦇' },
+      { id:'ghost',   icon:'👻' },
+    ],
+    aura: { id:'pumpkin', color:'#f97316' },
+  },
+  natale: {
+    sigils: [
+      { id:'tree',  icon:'🎄' },
+      { id:'snow',  icon:'❄️' },
+      { id:'star',  icon:'⭐' },
+      { id:'gift',  icon:'🎁' },
+    ],
+    aura: { id:'frost', color:'#38bdf8' },
+  },
+};
+
+let ACTIVE_SEASON = null; // id del tema attivo, impostato all'avvio da Firebase
+
+function seasonIsActive(cfg) {
+  if (!cfg || !cfg.id || !SEASONAL_THEMES[cfg.id]) return false;
+  const oggi = new Date().toISOString().slice(0, 10);
+  if (cfg.from && oggi < cfg.from) return false;
+  if (cfg.to   && oggi > cfg.to)   return false;
+  return true;
+}
+
+/** Sigilli disponibili: quelli di sempre più quelli della stagione in corso. */
+function availableSigils() {
+  const extra = ACTIVE_SEASON ? SEASONAL_THEMES[ACTIVE_SEASON].sigils : [];
+  return [...AVATAR_SIGILS, ...extra];
+}
+
+/** Aure disponibili: idem. */
+function availableAuras() {
+  const extra = ACTIVE_SEASON ? [SEASONAL_THEMES[ACTIVE_SEASON].aura] : [];
+  return [...AURA_COLORS, ...extra];
+}
+
 const AVATAR_SIGILS = [
   { id:'none', icon:'' },
   { id:'moon', icon:'🌙' },
@@ -1844,9 +1893,9 @@ function generateProfileComment(stats) {
 }
 
 function AvatarDisplay({ config = DEFAULT_AVATAR, size = 72 }) {
-  const auraObj = AURA_COLORS.find(a => a.id === (config.aura || 'moon')) || AURA_COLORS[2];
+  const auraObj = availableAuras().find(a => a.id === (config.aura || 'moon')) || AURA_COLORS[2];
   const heroObj = AVATAR_HEROES.find(h => h.id === (config.hero || 'lupo')) || AVATAR_HEROES[0];
-  const sigilObj = AVATAR_SIGILS.find(s => s.id === (config.sigil || 'none')) || AVATAR_SIGILS[0];
+  const sigilObj = availableSigils().find(s => s.id === (config.sigil || 'none')) || AVATAR_SIGILS[0];
 
   return (
     <div style={{
@@ -1898,8 +1947,10 @@ function AvatarCreator({ config = DEFAULT_AVATAR, onChange }) {
 
   const handleRandomize = () => {
     const rHero = AVATAR_HEROES[Math.floor(Math.random() * AVATAR_HEROES.length)].id;
-    const rSigil = AVATAR_SIGILS[Math.floor(Math.random() * AVATAR_SIGILS.length)].id;
-    const rAura = AURA_COLORS[Math.floor(Math.random() * AURA_COLORS.length)].id;
+    const tuttiSigilli = availableSigils();
+    const rSigil = tuttiSigilli[Math.floor(Math.random() * tuttiSigilli.length)].id;
+    const tutteAure = availableAuras();
+    const rAura = tutteAure[Math.floor(Math.random() * tutteAure.length)].id;
     onChange({ ...current, hero: rHero, sigil: rSigil, aura: rAura });
     triggerPop();
   };
@@ -1945,7 +1996,7 @@ function AvatarCreator({ config = DEFAULT_AVATAR, onChange }) {
 
         {activeTab === 'sigil' && (
           <div style={{display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center'}}>
-            {AVATAR_SIGILS.map(s => (
+            {availableSigils().map(s => (
               <button key={s.id} onClick={() => handleSelect('sigil', s.id)}
                 style={{
                   width:54, height:54, borderRadius:14, fontSize:22,
@@ -1964,7 +2015,7 @@ function AvatarCreator({ config = DEFAULT_AVATAR, onChange }) {
 
         {activeTab === 'aura' && (
           <div style={{display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center'}}>
-            {AURA_COLORS.map(a => (
+            {availableAuras().map(a => (
               <div key={a.id} onClick={() => handleSelect('aura', a.id)}
                 style={{
                   width:48, height:48, borderRadius:'50%', background:a.color, cursor:'pointer',
@@ -3450,6 +3501,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       setWinner(w);
       setNarrationAndPhase('ended', endMsg, null, {}, endMsgKey);
       fbUpdate({winner:w, phase:'ended'});
+      trackEvent('game_finished', { winner: w, day: currentDayNum, players: Object.keys(newStates||{}).length });
       publishRecap(w, newStates);
     }
 
@@ -3482,6 +3534,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   };
 
   const goFirstNight = ()=>{
+    trackEvent('first_night_started', { players: Object.keys(pStates||{}).length });
     setNightStep(0);
     setFrozenNightSteps(buildNightSteps(pStates, 1));
     setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null, { currentNightStep: null, nightVotes: null, dayVotes: null, nightDecisions: null }, 'night_open');
@@ -4307,12 +4360,20 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
                       {isReady && (
                         <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-[0_0_10px_#22c55e]">✓</div>
                       )}
+                      {p.isNarrator && (
+                        <div className="mb-2 px-3 py-1.5 rounded-full text-[11px] font-bold anim-pulse"
+                             style={{background:'rgba(226,201,126,0.16)', border:'1px solid rgba(226,201,126,0.5)', color:'#e2c97e'}}>
+                          {t('gameMaster.narratorIsYou')}
+                        </div>
+                      )}
                       <a href={playerUrl} target="_blank" rel="noreferrer" className="block" title={t('gameMaster.clickToOpenRoleTab')}>
                         <div className="flex justify-center rounded-xl overflow-hidden mb-3 mx-auto max-w-[150px]" style={{background:'#060b10'}}>
                           <QRCodeBox url={playerUrl} size={150}/>
                         </div>
                         <p className="font-cinzel font-bold text-white text-lg truncate" style={{color: isReady?'#4ade80':''}}>{p.name}</p>
-                        <p className="text-gray-500 text-[10px] uppercase mt-1">{t('gameMaster.playerOf', {i: i+1, total: players.length})}</p>
+                        <p className="text-gray-500 text-[10px] uppercase mt-1">
+                          {p.isNarrator ? t('gameMaster.narratorTapHint') : t('gameMaster.playerOf', {i: i+1, total: players.length})}
+                        </p>
                       </a>
                     </div>
                   );
@@ -5304,6 +5365,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
    PLAYER SCREEN (each player's device)
    ================================================================ */
 function PlayerScreen({gameId, playerId}) {
+  const joinTrackedRef = useRef(false); // l'evento player_joined va mandato una volta sola per sessione
   const user = useAuth();
   const [gameData, setGameData] = useState(null);
   const [flipped, setFlipped] = useState(false);
@@ -5355,6 +5417,10 @@ function PlayerScreen({gameId, playerId}) {
         }
       }
 
+      if (!joinTrackedRef.current && data.players?.[playerId]) {
+        joinTrackedRef.current = true;
+        trackEvent('player_joined', { phase: data.phase || 'unknown' });
+      }
       setGameData(data);
     });
     return ()=>ref.off();
@@ -6676,6 +6742,20 @@ function App() {
 
   const [forceUpdate, setForceUpdate] = useState(false);
 
+  // Tema stagionale: una chiave su Firebase accende sigilli e aure a tema,
+  // senza pubblicare una nuova versione. Vale anche sul web, non solo sul nativo.
+  const [, setSeasonTick] = useState(0);
+  useEffect(() => {
+    if (!db) return;
+    db.ref('config/seasonal').once('value').then(snap => {
+      const cfg = snap.val();
+      if (seasonIsActive(cfg)) {
+        ACTIVE_SEASON = cfg.id;
+        setSeasonTick(t => t + 1); // ridisegna: le liste sigilli/aure ora sono piu' lunghe
+      }
+    }).catch(e => console.warn('[seasonal] lettura fallita:', e?.message));
+  }, []);
+
   useEffect(() => {
     if (!window.IS_NATIVE_APP || !db) return;
     (async () => {
@@ -6821,6 +6901,9 @@ function App() {
       }}),{});
       db.ref(`games/${gid}`).set({ id:gid, phase:'waiting', createdAt:Date.now(), players:fbPlayers, publicVote });
     }
+    // L'evento sta fuori dal ramo Firebase: deve contarsi anche quando il database non c'e'
+    trackEvent('game_created', { players: withRoles.length, roles: new Set(withRoles.map(p=>p.role)).size, public_vote: !!publicVote });
+
     // Sessione narratore: permette di rientrare se la pagina ricarica a partita in corso
     try {
       localStorage.setItem('lif_gm_session', JSON.stringify({ gameId: gid, savedAt: Date.now() }));

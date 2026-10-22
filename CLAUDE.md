@@ -151,6 +151,9 @@ Archive originale conservato in `releases/LupusInFabula-1.3-build4.xcarchive` (g
 - **App Store Connect Analytics**: nessuno script — check diretto via browser (sessione autenticata) su richiesta.
 - **RevenueCat**: `monitor_revenuecat.mjs` — API v2 `/metrics/overview`. Credenziali in `.env` (gitignored): `REVENUECAT_SECRET_KEY` (⚠️ deve essere formato **V2**, la dashboard distingue le chiavi legacy da quelle v2 alla creazione) + `REVENUECAT_PROJECT_ID=f64d78ac`.
 - **Limite noto RevenueCat**: la metrica "Revenue" dell'endpoint overview **non include gli acquisti non-subscription** (i pack sono "non consumable") — mostra $0 anche con vendite reali. Per il dato preciso: endpoint `non-subscription_purchases` o "Recent Transactions" nella dashboard.
+⚠️ **Il "gap Analytics chiuso" della 1.3.1 era una mezza verità (verificato 2026-10-22).** Gli eventi strumentati sono SOLO cinque e tutti sul paywall (`paywall_view`, `purchase_attempt/success/cancel/error`): **nessun evento sul percorso di gioco**. In più `src/lib/analytics.js` inizializza Analytics **pigramente, alla prima `trackEvent`**, che avviene solo aprendo il paywall → chi non apre il paywall non viene contato nemmeno come sessione. Da qui "utenti attivi giornalieri: 0" e "nessun dato" sulla fidelizzazione in console Firebase, mentre il Realtime Database macina ~10 MB/settimana. Verificato eseguendo: prima del paywall zero richieste a Google Analytics, dopo il paywall `gtag.js` si carica e partono 2 `/g/collect`.
+**Da fare nella 1.6:** inizializzare Analytics all'avvio (dopo `initFirebase()`) e aggiungere gli eventi del percorso: partita creata, giocatore unito via QR, prima notte, partita conclusa.
+
 - **Decisione (2026-07-24):** niente spesa pubblicitaria finché la conversione a pagamento resta bassa (2% dopo 35gg) e manca instrumentazione Firebase Analytics nel codice (nessun evento tracciato — gap identificato dalla code-review, mai chiuso). Vedi `Product & Growth/piano_vendite_lupus_2026-07.md` per il piano completo.
 
 ---
@@ -166,6 +169,19 @@ Archive originale conservato in `releases/LupusInFabula-1.3-build4.xcarchive` (g
 | 🟡 | Rispondere alle domande di classificazione età sulle funzionalità social (scadenza **7 settembre 2026**) — risposte attese "No", l'app non ha chat/UGC |
 | 🟢 | Universal Links (`apple-app-site-association` su Vercel) — da includere nella build 1.4: renderebbero superfluo il pulsante "Apri app" |
 | ✅ | ~~Attivare `config/minVersion`~~ — fatto per v1.2 |
+
+### Eventi stagionali — pianificati (dal 2026-10-22)
+
+Meccanismo: chiave Firebase `config/seasonal` = `{ id, from, to }` → l'app accende sigilli e aure a tema senza pubblicare una versione (temi in `SEASONAL_THEMES`, `src/App.jsx`). Gli eventi in-app di App Store passano invece dalla revisione: inviare **5 giorni prima**.
+
+| Evento | Finestra | Invio evento entro | Offerta |
+|---|---|---|---|
+| Halloween 2026 | 30 ott – 1 nov | 24 ottobre | Combo €4,99 → €3,99 |
+| Feste di Natale | 18 dic – 6 gen | 11 dicembre | Combo scontato |
+| Carnevale 2027 | 5 – 9 febbraio | 30 gennaio | facoltativa |
+| Halloween 2027 | 29 – 31 ottobre | 22 ottobre 2027 | come 2026 |
+
+Procedura completa e regole (niente pubblicazioni nel weekend dell'evento, mai cambiare l'icona, mai un evento basato solo sullo sconto) in `Calendario eventi stagionali.pages`.
 
 ### Sviluppi futuri (idee, non pianificate)
 
