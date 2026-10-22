@@ -222,7 +222,7 @@ window.speakNarration = (text, staticKey) => {
   const voiceId = cfg.voice === 'custom' ? cfg.customVoice : cfg.voice;
 
   // ── 1. Prova il proxy Vercel (produzione — key sul server) ──
-  const apiBase = window.IS_NATIVE_APP ? 'https://lupus-in-fabula-eight.vercel.app' : window.location.origin;
+  const apiBase = window.IS_NATIVE_APP ? 'https://alba-dei-lupi.vercel.app' : window.location.origin;
   fetch(`${apiBase}/api/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -798,6 +798,7 @@ function UserProfile() {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
       const result = await SignInWithApple.authorize({
         clientId: 'com.lupusinfabula.app',
+        // NOTA: non cambiare finche' il nuovo dominio non e' fra i Return URL del Service ID su Apple Developer
         redirectURI: 'https://lupus-in-fabula-eight.vercel.app',
         scopes: 'email name',
       });
@@ -1622,7 +1623,7 @@ function PaywallModal({ packId, onClose, onPurchase, isPurchasing }) {
     setTriedOnce(true);
     try {
       const appUrl = window.Capacitor?.isNativePlatform?.()
-        ? 'https://lupus-in-fabula-eight.vercel.app'
+        ? 'https://alba-dei-lupi.vercel.app'
         : window.location.origin;
       const res = await fetch(`${appUrl}/api/speak`, {
         method: 'POST',
@@ -3166,7 +3167,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const loadELVoices = () => {
     if (elVoiceList.length > 0) return; // già caricate
     setElVoicesLoading(true);
-    const apiBaseVoices = window.IS_NATIVE_APP ? 'https://lupus-in-fabula-eight.vercel.app' : window.location.origin;
+    const apiBaseVoices = window.IS_NATIVE_APP ? 'https://alba-dei-lupi.vercel.app' : window.location.origin;
     fetch(`${apiBaseVoices}/api/voices`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(list => {
@@ -3228,7 +3229,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const timerRef = useRef(null);
   let appUrl = window.location.href.split('?')[0];
   if (appUrl.includes('localhost') || appUrl.startsWith('capacitor://') || appUrl.startsWith('file://')) {
-    appUrl = 'https://lupus-in-fabula-eight.vercel.app/';
+    appUrl = 'https://alba-dei-lupi.vercel.app/';
   }
 
   // Timer tick
