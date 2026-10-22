@@ -31,7 +31,7 @@
 }
 
 body {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Outfit', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   background: var(--night);
   color: #f1f5f9;
   min-height: 100vh;
@@ -39,7 +39,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.font-cinzel { font-family: 'Cinzel', serif !important; }
+.font-cinzel { font-family: 'Cinzel', serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji' !important; }
 
 /* ---- Stars ---- */
 .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
@@ -72,13 +72,13 @@ body {
 /* ---- Debug HUD ---- */
 #debug-hud {
   position: fixed; top: 0; left: 0; width: 100%; height: 20%;
-  background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace;
+  background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   font-size: 10px; z-index: 9999; overflow-y: scroll; pointer-events: none;
   display: none; border-bottom: 1px solid #00ff00;
 }
 #boot-status {
   position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-  background: var(--night); color: var(--moon); font-family: 'Cinzel', serif;
+  background: var(--night); color: var(--moon); font-family: 'Cinzel', serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   z-index: 9998;
 }
 
@@ -86,7 +86,7 @@ body {
   position: fixed; inset: 0; background: #8b1a1a; color: white;
   z-index: 10000; display: none; flex-direction: column;
   align-items: center; justify-content: center; padding: 20px;
-  font-family: sans-serif; text-align: center;
+  font-family: sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'; text-align: center;
 }
 
 /* ---- Card Flip ---- */
@@ -101,7 +101,7 @@ body {
   background: linear-gradient(135deg, #a67c00 0%, #dbb23b 30%, #fcec8e 50%, #dbb23b 70%, #a67c00 100%);
   background-size: 250% 100%;
   color: #0b0a14;
-  font-family: 'Cinzel', serif;
+  font-family: 'Cinzel', serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   font-weight: 800;
   border: none;
   cursor: pointer;
@@ -117,7 +117,7 @@ body {
   background: rgba(234, 204, 133, 0.05);
   color: var(--moon);
   border: 1px solid rgba(234, 204, 133, 0.3);
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Outfit', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -335,7 +335,7 @@ body {
   background-size: 300% 100%;
   animation: goldShimmer 30s linear infinite;
   color: #0b0a14;
-  font-family: 'Cinzel', serif;
+  font-family: 'Cinzel', serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   font-weight: 800;
   border: none;
   cursor: pointer;
@@ -442,6 +442,6 @@ body {
 
 .golden-number {
   color: #e2c97e; font-size: 48px; font-weight: 800; line-height: 1;
-  font-family: 'Cinzel', serif;
+  font-family: 'Cinzel', serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   text-shadow: 0 4px 20px rgba(226, 201, 126, 0.4);
 }
