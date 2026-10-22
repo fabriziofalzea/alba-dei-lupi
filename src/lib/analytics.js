@@ -10,6 +10,22 @@ import 'firebase/compat/analytics';
 let analytics = null;
 let tried = false;
 
+/**
+ * Accende Analytics all'avvio dell'app. Senza questa chiamata, Analytics si
+ * attivava solo alla prima trackEvent (tutte nel paywall): chi non apriva il
+ * paywall non veniva contato nemmeno come sessione, e la console mostrava
+ * zero utenti attivi mentre il database macinava traffico vero.
+ */
+export function initAnalytics() {
+  try {
+    if (tried) return;
+    tried = true;
+    if (firebase.apps.length) analytics = firebase.analytics();
+  } catch (e) {
+    console.warn('[analytics] init error:', e?.message);
+  }
+}
+
 export function trackEvent(name, params = {}) {
   try {
     if (!tried) {

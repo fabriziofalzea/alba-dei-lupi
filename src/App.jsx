@@ -8,7 +8,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import 'firebase/compat/auth';
 import 'firebase/compat/analytics';
-import { trackEvent } from './lib/analytics';
+import { trackEvent, initAnalytics } from './lib/analytics';
 
 // Riassegna per i riferimenti globali
 window.firebase = firebase;
@@ -742,6 +742,7 @@ function initFirebase() {
   } catch(e) { console.warn('Firebase init error:', e); }
 }
 initFirebase();
+initAnalytics();
 
 /* ── Safe Area iOS: CSS env() diretto, nessun JS timing issue ── */
 // Segnale globale: siamo in app nativa Capacitor?
@@ -3450,6 +3451,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       setWinner(w);
       setNarrationAndPhase('ended', endMsg, null, {}, endMsgKey);
       fbUpdate({winner:w, phase:'ended'});
+      trackEvent('game_finished', { winner: w, day: currentDayNum, players: Object.keys(newStates||{}).length });
       publishRecap(w, newStates);
     }
 
@@ -3482,6 +3484,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   };
 
   const goFirstNight = ()=>{
+    trackEvent('first_night_started', { players: Object.keys(pStates||{}).length });
     setNightStep(0);
     setFrozenNightSteps(buildNightSteps(pStates, 1));
     setNarrationAndPhase('night', NIGHT_NARRATION.open.open, null, { currentNightStep: null, nightVotes: null, dayVotes: null, nightDecisions: null }, 'night_open');
@@ -5304,6 +5307,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
    PLAYER SCREEN (each player's device)
    ================================================================ */
 function PlayerScreen({gameId, playerId}) {
+  const joinTrackedRef = useRef(false); // l'evento player_joined va mandato una volta sola per sessione
   const user = useAuth();
   const [gameData, setGameData] = useState(null);
   const [flipped, setFlipped] = useState(false);
@@ -5355,6 +5359,10 @@ function PlayerScreen({gameId, playerId}) {
         }
       }
 
+      if (!joinTrackedRef.current && data.players?.[playerId]) {
+        joinTrackedRef.current = true;
+        trackEvent('player_joined', { phase: data.phase || 'unknown' });
+      }
       setGameData(data);
     });
     return ()=>ref.off();
@@ -6821,6 +6829,9 @@ function App() {
       }}),{});
       db.ref(`games/${gid}`).set({ id:gid, phase:'waiting', createdAt:Date.now(), players:fbPlayers, publicVote });
     }
+    // L'evento sta fuori dal ramo Firebase: deve contarsi anche quando il database non c'e'
+    trackEvent('game_created', { players: withRoles.length, roles: new Set(withRoles.map(p=>p.role)).size, public_vote: !!publicVote });
+
     // Sessione narratore: permette di rientrare se la pagina ricarica a partita in corso
     try {
       localStorage.setItem('lif_gm_session', JSON.stringify({ gameId: gid, savedAt: Date.now() }));
