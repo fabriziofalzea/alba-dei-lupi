@@ -103,6 +103,8 @@ window._playAudioBlob = (blob) => {
 window.NARRATOR_STATIC_AUDIO = {
   it: {
     night_open: '/narrator/night_open.mp3',
+    night_close: '/narrator/night_close.mp3',
+    voting_start: '/narrator/voting_start.mp3',
     cupido_open: '/narrator/cupido_open.mp3',
     cupido_close: '/narrator/cupido_close.mp3',
     mitomane_open: '/narrator/mitomane_open.mp3',
@@ -139,6 +141,8 @@ window.NARRATOR_STATIC_AUDIO = {
   // EN — 31 file incisi con voce Daniel (EN native) via generate_narrator_audio_en.mjs (2026-07-23).
   en: {
     night_open: '/narrator/en/night_open.mp3',
+    night_close: '/narrator/en/night_close.mp3',
+    voting_start: '/narrator/en/voting_start.mp3',
     cupido_open: '/narrator/en/cupido_open.mp3',
     cupido_close: '/narrator/en/cupido_close.mp3',
     mitomane_open: '/narrator/en/mitomane_open.mp3',
@@ -798,8 +802,10 @@ function UserProfile() {
       const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
       const result = await SignInWithApple.authorize({
         clientId: 'com.lupusinfabula.app',
-        // NOTA: non cambiare finche' il nuovo dominio non e' fra i Return URL del Service ID su Apple Developer
-        redirectURI: 'https://lupus-in-fabula-eight.vercel.app',
+        // Sign in with Apple NON e' configurato: su Apple Developer non esiste alcun
+        // Services ID e questa funzione non e' collegata all'interfaccia (solo email/password).
+        // Se un giorno si attiva, registrare prima il dominio fra i Return URL del Service ID.
+        redirectURI: 'https://alba-dei-lupi.vercel.app',
         scopes: 'email name',
       });
       const provider = new firebase.auth.OAuthProvider('apple.com');
