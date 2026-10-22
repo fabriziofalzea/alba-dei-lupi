@@ -1074,7 +1074,7 @@ function Timer({seconds, total, running, onToggle, onReset, onEdit}) {
           style={{background: running?'rgba(139,26,26,0.6)':'rgba(26,74,26,0.6)',
                   border:`1px solid ${running?'rgba(239,68,68,0.4)':'rgba(74,222,128,0.4)'}`,
                   color: running?'#fca5a5':'#86efac'}}>
-          {running ? '⏸ Pausa' : '▶ Avvia'}
+          {running ? t('gameMaster.timerPause') : t('gameMaster.timerStart')}
         </button>
         <button onClick={onReset} className="px-3 py-1 rounded-lg text-xs font-bold transition-all glass text-gray-400 hover:text-white">
           ↺
@@ -1098,7 +1098,7 @@ function QRCodeBox({url, size=120}) {
         colorDark: '#e2c97e', colorLight: '#060b10',
         correctLevel: window.QRCode.CorrectLevel.M
       });
-    } catch(e) { ref.current.innerHTML = '<p style="color:#666;font-size:10px">QR non disponibile</p>'; }
+    } catch(e) { ref.current.innerHTML = '<p style="color:#666;font-size:10px">' + t('gameMaster.qrUnavailable') + '</p>'; }
   }, [url, size]);
   return <div ref={ref}/>;
 }
@@ -3171,7 +3171,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
     fetch(`${apiBaseVoices}/api/voices`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(list => {
-        const withCustom = [...list, { id: 'custom', name: 'Voice ID personalizzato…' }];
+        const withCustom = [...list, { id: 'custom', name: t('gameMaster.customVoiceId') }];
         setElVoiceList(withCustom);
         // Se non c'è ancora una voce salvata, imposta la prima della lista
         if (!localStorage.getItem('lif_el_voice') && list.length > 0) {
@@ -5083,7 +5083,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
               <div className="fixed inset-0 z-50 flex flex-col"
                    style={{background:'#0b0a14'}}>
                 {/* Header */}
-                <div className="flex items-center gap-3 px-4 pt-safe pt-5 pb-4"
+                <div className="flex items-center gap-3 px-4 safe-top pt-5 pb-4"
                      style={{background:'rgba(13,17,23,0.97)', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
                   <button onClick={() => setShowMyCard(false)}
                     className="text-gray-500 hover:text-white text-2xl leading-none transition-colors">←</button>
@@ -5107,7 +5107,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
                        style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)'}}>
                     <p className="text-gray-500 text-xs">{t('gameMaster.currentPhase')}</p>
                     <p className="text-white text-sm font-semibold mt-0.5 font-cinzel capitalize">
-                      {phase === 'night' ? t('gameMaster.phaseNight') : phase === 'day' ? t('gameMaster.phaseDay') : phase === 'voting' ? t('gameMaster.phaseVoting') : phase === 'dawn_reveal' ? t('gameMaster.phaseDawn') : phase === 'role_reveal' ? t('gameMaster.phaseRoleReveal') : '⏳ ' + phase}
+                      {phase === 'night' ? t('gameMaster.phaseNight') : phase === 'day' ? t('gameMaster.phaseDay') : phase === 'voting' ? t('gameMaster.phaseVoting') : phase === 'dawn_reveal' ? t('gameMaster.phaseDawn') : phase === 'role_reveal' ? t('gameMaster.phaseRoleReveal') : t('gameMaster.phaseWaiting')}
                     </p>
                   </div>
 
@@ -5267,7 +5267,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
                 </div>
 
                 {/* Bottone torna */}
-                <div className="px-4 pb-safe pb-6 pt-3"
+                <div className="px-4 safe-bottom pb-6 pt-3"
                      style={{background:'rgba(13,17,23,0.97)', borderTop:'1px solid rgba(255,255,255,0.06)'}}>
                   <button onClick={() => setShowMyCard(false)}
                     className="btn-gold w-full py-4 rounded-2xl text-base">
@@ -6183,11 +6183,11 @@ function PlayerScreen({gameId, playerId}) {
                   })()}
 
                   {/* ── VEGGENTE: rivela l'allineamento dopo il voto ── */}
-                  {player.role === 'veggente' && localVote && (() => {
-                    const rawRole = gameData.players?.[localVote]?.role;
+                  {player.role === 'veggente' && (localVote || gameData.nightVotes?.[playerId]) && (() => {
+                    const rawRole = gameData.players?.[(localVote || gameData.nightVotes?.[playerId])]?.role;
                     // Mitomane: la Veggente vede il ruolo imitato, non "mitomane"
                     const mt = gameData.mitomaneTargets;
-                    const suoTarget = mt && Object.keys(mt).length ? mt[localVote] : gameData.mitomaneTarget;
+                    const suoTarget = mt && Object.keys(mt).length ? mt[(localVote || gameData.nightVotes?.[playerId])] : gameData.mitomaneTarget;
                     const effectiveRoleId = (rawRole === 'mitomane' && suoTarget)
                       ? gameData.players?.[suoTarget]?.role
                       : rawRole;

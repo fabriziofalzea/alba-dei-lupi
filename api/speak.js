@@ -4,6 +4,20 @@
 
 const DEFAULT_VOICE = 'onwK4e9ZLuTAKqWW03F9'; // Daniel
 
+// Solo le voci offerte dall'app: senza questa lista chiunque puo' usare
+// qualsiasi voce dell'account ElevenLabs passando un id arbitrario.
+const ALLOWED_VOICES = new Set([
+  'onwK4e9ZLuTAKqWW03F9', // Daniel
+  'TX3LPaxmHKxFdv7VOQHJ', // Liam
+  'pqHfZKP75CvOlQylNhV4', // Bill
+  'N2lVS1w4EtoT3dr4eOWO', // Callum
+  'XB0fDUnXU5powFXDhCwa', // Charlotte
+  'Xb7hH8MSUJpSbSDYk0k2', // Alice
+]);
+
+// Le frasi del narratore piu' lunghe stanno sotto i 300 caratteri.
+const MAX_TEXT = 400;
+
 export default async function handler(req, res) {
   // Preflight CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,6 +41,14 @@ export default async function handler(req, res) {
 
   if (!text.trim()) {
     return res.status(400).json({ error: 'Testo vuoto' });
+  }
+
+  if (text.length > MAX_TEXT) {
+    return res.status(413).json({ error: 'Testo troppo lungo' });
+  }
+
+  if (!ALLOWED_VOICES.has(voiceId)) {
+    return res.status(400).json({ error: 'Voce non consentita' });
   }
 
   try {

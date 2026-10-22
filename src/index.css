@@ -5,8 +5,8 @@
   --color-blood: #b91c1c;
   --color-night: #0b0a14;
   --color-midnight: #040306;
-  --font-cinzel: "Cinzel", serif;
-  --font-outfit: "Outfit", sans-serif;
+  --font-cinzel: "Cinzel", serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-outfit: "Outfit", sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 }
 
 :root {
