@@ -1,8 +1,14 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "mkdir -p www && printf '<!doctype html><meta charset=\"utf-8\"><title>Redirect</title>' > www/index.html",
   "installCommand": "npm install",
   "outputDirectory": "www",
+  "redirects": [
+    {
+      "source": "/:path((?!api/).*)",
+      "destination": "https://alba-dei-lupi.vercel.app/:path",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
