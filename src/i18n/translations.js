@@ -187,7 +187,7 @@ export const IT = {
     start: '🐺 Inizia a giocare!',
     prev: '← Indietro',
     steps: [
-      { title: 'Benvenuto a L\'Alba dei Lupi', content: 'Un villaggio di notte. Qualcuno tra voi non è quello che sembra. L\'Alba dei Lupi è un gioco di inganno, deduzione e bluff: scopri i lupi prima che sia troppo tardi.', icon: '🐺' },
+      { title: 'Benvenuto ne L\'Alba dei Lupi', content: 'Un villaggio di notte. Qualcuno tra voi non è quello che sembra. L\'Alba dei Lupi è un gioco di inganno, deduzione e bluff: scopri i lupi prima che sia troppo tardi.', icon: '🐺' },
       { title: 'Le due fazioni', content: 'Lupi 🐺: attaccano di notte e mentono di giorno. Villaggio 🌾: deve scoprirli e votarli fuori.', icon: '⚔️' },
       { title: 'La notte', content: 'Di notte il villaggio dorme. I ruoli speciali si attivano in silenzio uno per volta: ogni scelta conta, ogni errore può costare una vita.', icon: '🌙' },
       { title: 'L\'alba', content: 'All\'alba si conta chi manca. Il Narratore annuncia le vittime della notte — e ogni rivelazione cambia i sospetti, le alleanze, il gioco.', icon: '☀️' },
