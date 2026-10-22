@@ -1,6 +1,6 @@
 /**
  * capture_screenshots_en.mjs
- * Genera screenshot EN per App Store (6.5" — 1284x2778) via Playwright headless.
+ * Genera screenshot EN per App Store (Dynamic Island — 1206x2622) via Playwright headless.
  * Usa il dev server locale (localhost:5173), forza lingua EN, naviga le schermate chiave.
  * Esegui con: node capture_screenshots_en.mjs
  * Output: screenshots_en/*.png
@@ -19,7 +19,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({
-    viewport: { width: 428, height: 926 },
+    viewport: { width: 402, height: 874 },
     deviceScaleFactor: 3,
     isMobile: true,
     hasTouch: true,
