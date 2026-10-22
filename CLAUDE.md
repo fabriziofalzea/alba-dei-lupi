@@ -1,7 +1,7 @@
 # LUPUS IN FABULA — Claude Code Instructions
 
 > Agente specializzato di Jarvis per lo sviluppo e la gestione dell'app Lupus In Fabula.
-> Versione: 1.4 (web) / 1.3.1 (iOS) | Aggiornato: 2026-08-09
+> Versione: 1.4 (web + iOS) | Aggiornato: 2026-08-19
 
 ---
 
@@ -17,14 +17,14 @@ Regole comportamentali: vedi `../Jarvis/CLAUDE.md` (profilo utente, stile, proat
 
 | Info | Valore |
 |---|---|
-| **Nome** | Lupus In Fabula |
+| **Nome** | L'Alba dei Lupi (IT) / Dawn of the Wolves (EN) — ex "Lupus In Fabula" fino alla 1.4 |
 | **Bundle ID** | `com.lupusinfabula.app` |
 | **App Store ID** | `id6764061104` |
 | **App Store URL** | `https://apps.apple.com/app/lupus-in-fabula/id6764061104` |
 | **Web (Vercel)** | `https://lupus-in-fabula-eight.vercel.app` |
-| **Stato** | iOS: v1.3.1 (build 5) live dal 2026-07-27, 16 paesi. Web: avanti a iOS con le modifiche gameplay del 2026-08-09 |
-| **Live iOS** | v1.3.1 (build 5) |
-| **Live web** | modifiche gameplay 2026-08-09 (non ancora nell'app nativa) |
+| **Stato** | iOS: **v1.4 (build 6) live dal 2026-08-16**, 16 paesi. Rating 5,0 su 10 valutazioni |
+| **Live iOS** | v1.4 (build 6) |
+| **Live web** | allineato a v1.4 |
 
 ---
 
@@ -125,7 +125,7 @@ open -a Xcode "/tmp/LupusInFabula.xcarchive"
 | 1.2 | 3 | 2026-05-12 | ✅ Live (RC login UID + force update) |
 | 1.3 | 4 | 2026-07-24 | ✅ Live — approvata 2026-07-25/26, disponibile in 16 paesi (Italia + 15 esteri) |
 | 1.3.1 | 5 | 2026-07-26 | ✅ Live — approvata 2026-07-27, Firebase Analytics (paywall_view, purchase_attempt/success/cancel/error) |
-| 1.4 | — | 2026-08-09 | 🟡 **Solo web** — gameplay (Indemoniato, Mitomane, voto palese, fix QR). Build iOS non ancora fatta |
+| 1.4 | 6 | 2026-08-16 | ✅ **Live su App Store** (22:12 UTC) — Indemoniato, Cupido ogni notte, voto palese/segreto, cronaca notti, riconoscimento lupi, fix Sciamano/Strega |
 
 **Storia sblocco upload 1.3(4) (2026-07-23):** tre ostacoli in sequenza, tutti risolti:
 1. `403 REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED` — Apple Developer Program License Agreement da riaccettare (solo titolare account, no via API). Fabrizio l'ha accettato su developer.apple.com → risolto (con qualche minuto di propagazione lato Apple).
@@ -159,8 +159,7 @@ Archive originale conservato in `releases/LupusInFabula-1.3-build4.xcarchive` (g
 
 | Priorità | Azione |
 |---|---|
-| 🔴 | **Build iOS 1.4** — le modifiche gameplay del 2026-08-09 sono live solo sul web, l'app nativa è ferma a 1.3.1 |
-| 🔴 | **Partita di prova multi-dispositivo** prima della submission 1.4: Mitomane, Indemoniato, voto palese e fix QR non sono mai stati provati in una partita vera |
+| 🟡 | **Partita di prova multi-dispositivo sulla 1.4 live**: Mitomane, Indemoniato, voto palese e fix QR sono spediti — verificare sul campo che si comportino bene |
 | 🟡 | Verificare restrizione geografica (Afghanistan, Marocco — 13+) |
 | 🟡 | Sign in with Apple — Xcode entitlement + Firebase provider Apple |
 | 🟡 | UX: feedback post-acquisto pack narratore |
@@ -243,3 +242,19 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 ### Ancora aperto
 - **`checkWin` non implementa nessuna vittoria di terze parti** — oggi non serve più (amore rimossa), ma se si aggiungono ruoli con vittoria propria va rifatta
 - Con più Medium il **riepilogo finale dei giocatori** mostra le visioni, ma la narrazione dell'alba resta sintetica
+
+## Stato e prossimi passi
+
+**Aggiornato:** 2026-10-22
+
+**A che punto siamo:** rinomina in corso per la diffida daVinci (scadenza invio Apple: **3 novembre 2026**). Branch `feat/rename-alba-dei-lupi`: commit `229dc5a` (sorgente, i18n, privacy, wordmark, titolo, appName) + `24144cb` (i 3 bloccanti della review: `CFBundleDisplayName`, bundle iOS risincronizzato, `MARKETING_VERSION` 1.5, grammatica onboarding, `APP_STORE_URL` senza slug). Build pulita, `cap sync ios` eseguito (serve `LANG=en_US.UTF-8`, altrimenti CocoaPods fallisce), zero occorrenze del vecchio nome nel bundle iOS. Repo GitHub rinominato in `fabriziofalzea/alba-dei-lupi`. Pacchetto ASO pronto in `../Product & Growth/aso_alba_dei_lupi_2026-10.md`.
+
+**Prossimi passi:**
+1. Merge su `master` + nuovo progetto Vercel `alba-dei-lupi`; il progetto attuale resta come ponte: solo `/api/*` + redirect 308 del resto (la 1.4 ha il dominio hardcoded per la Voce AI)
+2. Aggiornare le 5 costanti del dominio in `App.jsx` (225, 801, 1625, 3169, 3231) e aggiungere il nuovo dominio ai return URL Apple e ai domini autorizzati Firebase
+3. Rigenerare i 5 screenshot IT/EN (mostrano il wordmark vecchio) e compilare la scheda su App Store Connect
+4. Archive 1.5 (build 7) e invio: **target 30 ottobre**, per avere margine su un eventuale rifiuto
+5. Evidenza formale della sottomissione a Corbelli entro il 3 novembre
+6. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico, dopo l'invio
+
+**In attesa di Fabrizio:** scelta fra nome lungo + sottotitolo AI (B) e nome corto + "Il gioco del lupo mannaro" (A); se localizzare il nome sotto l'icona per gli utenti EN.
