@@ -166,7 +166,7 @@ export const IT = {
   },
 
   privacy: {
-    title: 'Lupus in Fabula',
+    title: 'L\'Alba dei Lupi',
     subtitle: 'Prima di iniziare, due parole su privacy e dati.',
     point1Title: 'I tuoi dati restano tuoi',
     point1Body: 'Non vendiamo né condividiamo i tuoi dati con terze parti a scopo commerciale.',
@@ -187,7 +187,7 @@ export const IT = {
     start: '🐺 Inizia a giocare!',
     prev: '← Indietro',
     steps: [
-      { title: 'Benvenuto a Lupus in Fabula', content: 'Un villaggio di notte. Qualcuno tra voi non è quello che sembra. Lupus in Fabula è un gioco di inganno, deduzione e bluff: scopri i lupi prima che sia troppo tardi.', icon: '🐺' },
+      { title: 'Benvenuto ne L\'Alba dei Lupi', content: 'Un villaggio di notte. Qualcuno tra voi non è quello che sembra. L\'Alba dei Lupi è un gioco di inganno, deduzione e bluff: scopri i lupi prima che sia troppo tardi.', icon: '🐺' },
       { title: 'Le due fazioni', content: 'Lupi 🐺: attaccano di notte e mentono di giorno. Villaggio 🌾: deve scoprirli e votarli fuori.', icon: '⚔️' },
       { title: 'La notte', content: 'Di notte il villaggio dorme. I ruoli speciali si attivano in silenzio uno per volta: ogni scelta conta, ogni errore può costare una vita.', icon: '🌙' },
       { title: 'L\'alba', content: 'All\'alba si conta chi manca. Il Narratore annuncia le vittime della notte — e ogni rivelazione cambia i sospetti, le alleanze, il gioco.', icon: '☀️' },
@@ -479,7 +479,7 @@ export const IT = {
       ended_voting: { label: 'Il verdetto è stato emesso', tip: '' },
       ended: { label: 'Partita terminata', tip: '' },
     },
-    appBannerTitle: 'Lupus in Fabula è su App Store',
+    appBannerTitle: 'L\'Alba dei Lupi è su App Store',
     appBannerSubtitle: 'Gratuita · Voce AI · Profilo · Classifiche',
     openApp: 'Apri →',
     download: 'Scarica',
@@ -605,7 +605,7 @@ export const IT = {
 
   forceUpdate: {
     title: 'Aggiornamento richiesto',
-    body: 'Una nuova versione di Lupus In Fabula è disponibile. Aggiorna per continuare a giocare.',
+    body: 'Una nuova versione de L\'Alba dei Lupi è disponibile. Aggiorna per continuare a giocare.',
     cta: 'Aggiorna su App Store',
   },
 
@@ -781,7 +781,7 @@ export const EN = {
   },
 
   privacy: {
-    title: 'Lupus in Fabula',
+    title: 'Dawn of the Wolves',
     subtitle: 'Before we start, a quick word on privacy and data.',
     point1Title: 'Your data stays yours',
     point1Body: 'We don\'t sell or share your data with third parties for commercial purposes.',
@@ -802,7 +802,7 @@ export const EN = {
     start: '🐺 Start playing!',
     prev: '← Back',
     steps: [
-      { title: 'Welcome to Lupus in Fabula', content: 'A village at night. Someone among you isn\'t who they seem. Lupus in Fabula is a game of deception, deduction and bluff: find the werewolves before it\'s too late.', icon: '🐺' },
+      { title: 'Welcome to Dawn of the Wolves', content: 'A village at night. Someone among you isn\'t who they seem. Dawn of the Wolves is a game of deception, deduction and bluff: find the werewolves before it\'s too late.', icon: '🐺' },
       { title: 'The two factions', content: 'Werewolves 🐺: attack at night and lie during the day. Village 🌾: must uncover them and vote them out.', icon: '⚔️' },
       { title: 'The night', content: 'At night the village sleeps. Special roles activate silently, one at a time: every choice matters, every mistake can cost a life.', icon: '🌙' },
       { title: 'The dawn', content: 'At dawn, you count who\'s missing. The Narrator announces the night\'s victims — and every reveal shifts the suspicions, the alliances, the game.', icon: '☀️' },
@@ -1094,7 +1094,7 @@ export const EN = {
       ended_voting: { label: 'The verdict has been reached', tip: '' },
       ended: { label: 'Game over', tip: '' },
     },
-    appBannerTitle: 'Lupus in Fabula is on the App Store',
+    appBannerTitle: 'Dawn of the Wolves is on the App Store',
     appBannerSubtitle: 'Free · AI Voice · Profile · Leaderboards',
     openApp: 'Open →',
     download: 'Download',
@@ -1220,7 +1220,7 @@ export const EN = {
 
   forceUpdate: {
     title: 'Update required',
-    body: 'A new version of Lupus In Fabula is available. Update to keep playing.',
+    body: 'A new version of Dawn of the Wolves is available. Update to keep playing.',
     cta: 'Update on the App Store',
   },
 

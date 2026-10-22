@@ -1,7 +1,7 @@
 {
-  "name": "lupus-in-fabula",
+  "name": "alba-dei-lupi",
   "version": "1.0.0",
-  "description": "Lupus in Fabula — Party game app",
+  "description": "L'Alba dei Lupi — Party game app",
   "main": "index.html",
   "type": "module",
   "scripts": {

@@ -363,7 +363,7 @@ window.stopSfx = (id) => {
 /* ================================================================
    APP STORE URL — aggiorna quando l'app è live su App Store
    ================================================================ */
-const APP_STORE_URL = 'https://apps.apple.com/app/lupus-in-fabula/id6764061104';
+const APP_STORE_URL = 'https://apps.apple.com/app/id6764061104';
 
 /* ================================================================
    FIREBASE CONFIG — inserisci i tuoi dati (vedi SETUP.md)
@@ -1501,7 +1501,7 @@ function HomeScreen({onCreateGame, onViewHistory, onProfile}) {
 
         {/* Titolo */}
         <h1 className="font-cinzel text-5xl font-bold moon-glow mb-1 leading-tight tracking-wide">
-          Lupus<br/>in Fabula
+          {lang === 'en' ? <>Dawn of<br/>the Wolves</> : <>L'Alba<br/>dei Lupi</>}
         </h1>
         <p className="font-outfit text-xs tracking-[0.35em] font-normal uppercase mb-8 opacity-80" style={{color:'var(--moon)'}}>
           ✦ &nbsp;{t('home.tagline')}&nbsp; ✦
