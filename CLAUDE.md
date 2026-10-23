@@ -271,6 +271,10 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 **Halloween:** evento in-app approvato e pubblicato (IT + EN), **anticipato il 23/10 a 23 ott 19:30 → 1 nov 23:30** e sconto attivo **da subito** fino al 2 nov su 175 paesi (Italia €4,99 → €3,99, USA $5,99 → $4,49), `config/seasonal` scritto su Firebase. Il tema stagionale si accenderà **solo se la 1.6 è live entro il 30**: il codice che lo legge non è nella 1.5.
 
+**Regola sulla copy degli eventi (dal 23/10): mai date, durate o numeri nel testo.** Il conto alla rovescia lo mostra già Apple sulla scheda ("inizia fra 2 giorni", "finisce fra 2 giorni"), quindi scriverlo è ridondante — e si paga caro, perché nome, descrizioni e immagini sono congelati dopo l'approvazione mentre le date restano modificabili. Copy generica + date mobili = si può anticipare, allungare o accorciare un evento senza rimetterlo in revisione e senza che il testo diventi falso. Caso reale: "Il Pack Completo in offerta per tre notti" è diventato impreciso appena abbiamo anticipato la promo, e non era più correggibile.
+
+Formule che reggono qualsiasi finestra: *"Il Pack Completo a prezzo ridotto"*, *"Tutti i ruoli e la voce del narratore, in offerta"*, *"Sconto sul gioco completo"*.
+
 **Lezione sul tempismo (23/10).** L'evento aveva data di pubblicazione **23 ott 05:30** ma inizio 30 ott: per una settimana la scheda prodotto annunciava uno sconto che non esisteva, dando a chi arrivava un motivo per rimandare l'acquisto. Scoperto controllando il campo "Data e ora di pubblicazione", che è **separato** dalla data di inizio. Regola per i prossimi eventi: la data di pubblicazione non va lasciata al default, va messa vicino all'inizio — oppure lo sconto va fatto partire dalla pubblicazione.
 
 **Cosa si può modificare su un evento già approvato** (verificato sul campo): date di inizio e fine, priorità, paesi — e il salvataggio **non** rimanda in revisione (provato il 23/10: stato rimasto "Approvato · Pubblicato"). Sono invece congelati nome, descrizioni, immagini, badge, deep link e la data di pubblicazione. Cambiare la copy richiede di cancellare l'evento e rifarlo, con nuova revisione.
