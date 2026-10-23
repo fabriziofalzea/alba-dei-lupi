@@ -178,7 +178,7 @@ Meccanismo: chiave Firebase `config/seasonal` = `{ id, from, to }` → l'app acc
 
 | Evento | Finestra | Invio evento entro | Offerta |
 |---|---|---|---|
-| Halloween 2026 | 30 ott – 1 nov | 24 ottobre | Combo €4,99 → €3,99 · USA $5,99 → $4,49 |
+| Halloween 2026 | **23 ott – 1 nov** (anticipato) | 24 ottobre | Combo €4,99 → €3,99 · USA $5,99 → $4,49 |
 | Feste di Natale | 18 dic – 6 gen | 11 dicembre | Combo scontato |
 | Carnevale 2027 | 5 – 9 febbraio | 30 gennaio | facoltativa |
 | Halloween 2027 | 29 – 31 ottobre | 22 ottobre 2027 | come 2026 |
@@ -269,7 +269,11 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 **1.6 (build 12) INVIATA alla verifica il 23/10 alle 15:10**, stato "In attesa di verifica". Apple dichiara fino a 48 ore: build agganciata, conformità crittografica dichiarata ("nessuno degli algoritmi citati"), note di versione IT + EN, rilascio automatico dopo l'approvazione **senza rilascio in più fasi** (con Halloween a sette giorni un rollout graduale sarebbe controproducente). Provata sul simulatore prima dell'invio: hint del narratore visibile, Analytics acceso all'avvio, prezzi USA nuovi nel paywall.
 
-**Halloween:** evento in-app approvato e pubblicato (IT + EN), sconto 30 ott → 2 nov su 175 paesi (Italia €4,99 → €3,99, USA $5,99 → $4,49), `config/seasonal` scritto su Firebase. Il tema stagionale si accenderà **solo se la 1.6 è live entro il 30**: il codice che lo legge non è nella 1.5.
+**Halloween:** evento in-app approvato e pubblicato (IT + EN), **anticipato il 23/10 a 23 ott 19:30 → 1 nov 23:30** e sconto attivo **da subito** fino al 2 nov su 175 paesi (Italia €4,99 → €3,99, USA $5,99 → $4,49), `config/seasonal` scritto su Firebase. Il tema stagionale si accenderà **solo se la 1.6 è live entro il 30**: il codice che lo legge non è nella 1.5.
+
+**Lezione sul tempismo (23/10).** L'evento aveva data di pubblicazione **23 ott 05:30** ma inizio 30 ott: per una settimana la scheda prodotto annunciava uno sconto che non esisteva, dando a chi arrivava un motivo per rimandare l'acquisto. Scoperto controllando il campo "Data e ora di pubblicazione", che è **separato** dalla data di inizio. Regola per i prossimi eventi: la data di pubblicazione non va lasciata al default, va messa vicino all'inizio — oppure lo sconto va fatto partire dalla pubblicazione.
+
+**Cosa si può modificare su un evento già approvato** (verificato sul campo): date di inizio e fine, priorità, paesi — e il salvataggio **non** rimanda in revisione (provato il 23/10: stato rimasto "Approvato · Pubblicato"). Sono invece congelati nome, descrizioni, immagini, badge, deep link e la data di pubblicazione. Cambiare la copy richiede di cancellare l'evento e rifarlo, con nuova revisione.
 
 **Listino USA** gestito a mano dal 23/10 su tutti e quattro i prodotti (singoli $2,99, combo $5,99): era più basso dell'Italia. Apple non lo adegua più da sé. Attenzione: alzare un prezzo di base può sfilare un paese dalle promo attive — verificare sempre dopo ogni modifica.
 
