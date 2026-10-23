@@ -267,18 +267,17 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 **A che punto siamo:** **1.5 (build 10) approvata e LIVE dal 23/10, 12:34 UTC** — l'App Store serve `L'Alba dei Lupi: Lupo Mannaro` v1.5. La rinomina imposta dalla diffida daVinci è quindi completata e pubblicata, 11 giorni prima della scadenza del 3 novembre.
 
-**1.6 (build 12) pronta per l'invio** su ASC: build agganciata, conformità crittografica dichiarata ("nessuno degli algoritmi citati"), note di versione IT + EN, rilascio automatico dopo l'approvazione **senza rilascio in più fasi** (con Halloween a sette giorni un rollout graduale sarebbe controproducente). Manca solo il clic su "Aggiungi alla verifica", che resta a Fabrizio. Provata sul simulatore: hint del narratore visibile, Analytics acceso all'avvio, prezzi USA nuovi nel paywall.
+**1.6 (build 12) INVIATA alla verifica il 23/10 alle 15:10**, stato "In attesa di verifica". Apple dichiara fino a 48 ore: build agganciata, conformità crittografica dichiarata ("nessuno degli algoritmi citati"), note di versione IT + EN, rilascio automatico dopo l'approvazione **senza rilascio in più fasi** (con Halloween a sette giorni un rollout graduale sarebbe controproducente). Provata sul simulatore prima dell'invio: hint del narratore visibile, Analytics acceso all'avvio, prezzi USA nuovi nel paywall.
 
 **Halloween:** evento in-app approvato e pubblicato (IT + EN), sconto 30 ott → 2 nov su 175 paesi (Italia €4,99 → €3,99, USA $5,99 → $4,49), `config/seasonal` scritto su Firebase. Il tema stagionale si accenderà **solo se la 1.6 è live entro il 30**: il codice che lo legge non è nella 1.5.
 
 **Listino USA** gestito a mano dal 23/10 su tutti e quattro i prodotti (singoli $2,99, combo $5,99): era più basso dell'Italia. Apple non lo adegua più da sé. Attenzione: alzare un prezzo di base può sfilare un paese dalle promo attive — verificare sempre dopo ogni modifica.
 
 **Prossimi passi:**
-1. **"Aggiungi alla verifica" sulla 1.6** — invio ad Apple, resta a Fabrizio. Prima parte, più margine c'è per avere il tema acceso il 30
-2. **Mail di evidenza a Corbelli**: bozza pronta in Gmail, aggiornata al fatto che la 1.5 è *pubblicata* (non più solo sottomessa) e col punto 4 sull'aggiornamento obbligatorio. La condizione che Fabrizio aveva posto (versione approvata) è soddisfatta: si può mandare. Allegare lo screenshot dello stato ASC
-3. **`config/minVersion`**: Fabrizio ha deciso il 23/10 di aspettare che sia live anche la **1.6**, per forzare una volta sola e consegnare insieme il tema di Halloween. ⚠️ Se al **31/10** la 1.6 non fosse ancora live, impostarlo sulla versione live in quel momento: la conformità al marchio non può restare appesa a una seconda coda Apple
-4. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico
-5. Minori dalla review: pareggio nelle votazioni, keep-awake, audio demo del paywall, sfx morti, nodo pubblico leaderboard, scope di lettura su `/users`
-6. Universal links (AASA + entitlement `associated-domains`) rimandati alla 1.7
+1. **Mail di evidenza a Corbelli**: bozza pronta in Gmail, aggiornata al fatto che la 1.5 è *pubblicata* (non più solo sottomessa) e col punto 4 sull'aggiornamento obbligatorio. La condizione che Fabrizio aveva posto (versione approvata) è soddisfatta: si può mandare. Allegare lo screenshot dello stato ASC
+2. **`config/minVersion`**: Fabrizio ha deciso il 23/10 di aspettare che sia live anche la **1.6**, per forzare una volta sola e consegnare insieme il tema di Halloween. ⚠️ Se al **31/10** la 1.6 non fosse ancora live, impostarlo sulla versione live in quel momento: la conformità al marchio non può restare appesa a una seconda coda Apple
+3. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico
+4. Minori dalla review: pareggio nelle votazioni, keep-awake, audio demo del paywall, sfx morti, nodo pubblico leaderboard, scope di lettura su `/users`
+5. Universal links (AASA + entitlement `associated-domains`) rimandati alla 1.7
 
-**In attesa di Fabrizio:** invio della 1.6 alla verifica; invio della mail a Corbelli.
+**In attesa di Fabrizio:** invio della mail a Corbelli. **In attesa di Apple:** esito della verifica sulla 1.6 (inviata 23/10 15:10). Se approvata entro il 27-28, il tema di Halloween fa in tempo ad accendersi il 30.
