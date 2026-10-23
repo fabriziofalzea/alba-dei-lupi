@@ -1849,6 +1849,34 @@ function availableAuras() {
   return [...AURA_COLORS, ...extra];
 }
 
+/* Chi si prende la zucca ad Halloween se la tiene anche dopo: per disegnare un
+   avatar servono tutti i sigilli e le aure mai esistiti, non solo quelli della
+   stagione in corso. Scegliere resta invece un privilegio della stagione. */
+function allSigils() {
+  return [...AVATAR_SIGILS, ...Object.values(SEASONAL_THEMES).flatMap(t => t.sigils)];
+}
+
+function allAuras() {
+  return [...AURA_COLORS, ...Object.values(SEASONAL_THEMES).map(t => t.aura)];
+}
+
+/* Nella scelta: la stagione in corso piu', se c'e', il pezzo di una stagione
+   passata che il giocatore porta gia'. Altrimenti sparirebbe dalla griglia
+   mentre resta sul suo avatar. */
+function sigilChoices(owned) {
+  const lista = availableSigils();
+  if (!owned || lista.some(s => s.id === owned)) return lista;
+  const suo = allSigils().find(s => s.id === owned);
+  return suo ? [...lista, suo] : lista;
+}
+
+function auraChoices(owned) {
+  const lista = availableAuras();
+  if (!owned || lista.some(a => a.id === owned)) return lista;
+  const sua = allAuras().find(a => a.id === owned);
+  return sua ? [...lista, sua] : lista;
+}
+
 const AVATAR_SIGILS = [
   { id:'none', icon:'' },
   { id:'moon', icon:'🌙' },
@@ -1893,9 +1921,9 @@ function generateProfileComment(stats) {
 }
 
 function AvatarDisplay({ config = DEFAULT_AVATAR, size = 72 }) {
-  const auraObj = availableAuras().find(a => a.id === (config.aura || 'moon')) || AURA_COLORS[2];
+  const auraObj = allAuras().find(a => a.id === (config.aura || 'moon')) || AURA_COLORS[2];
   const heroObj = AVATAR_HEROES.find(h => h.id === (config.hero || 'lupo')) || AVATAR_HEROES[0];
-  const sigilObj = availableSigils().find(s => s.id === (config.sigil || 'none')) || AVATAR_SIGILS[0];
+  const sigilObj = allSigils().find(s => s.id === (config.sigil || 'none')) || AVATAR_SIGILS[0];
 
   return (
     <div style={{
@@ -1996,7 +2024,7 @@ function AvatarCreator({ config = DEFAULT_AVATAR, onChange }) {
 
         {activeTab === 'sigil' && (
           <div style={{display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center'}}>
-            {availableSigils().map(s => (
+            {sigilChoices(current.sigil).map(s => (
               <button key={s.id} onClick={() => handleSelect('sigil', s.id)}
                 style={{
                   width:54, height:54, borderRadius:14, fontSize:22,
@@ -2015,7 +2043,7 @@ function AvatarCreator({ config = DEFAULT_AVATAR, onChange }) {
 
         {activeTab === 'aura' && (
           <div style={{display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center'}}>
-            {availableAuras().map(a => (
+            {auraChoices(current.aura).map(a => (
               <div key={a.id} onClick={() => handleSelect('aura', a.id)}
                 style={{
                   width:48, height:48, borderRadius:'50%', background:a.color, cursor:'pointer',
