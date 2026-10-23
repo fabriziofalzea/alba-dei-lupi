@@ -269,9 +269,9 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 **Prossimi passi:**
 1. **Entro il 24/10:** cliccare "Aggiungi alla verifica" sull'evento in-app (invio ad Apple, resta a Fabrizio)
-2. **Sabato 24/10:** mail di evidenza formale a Corbelli (bozza pronta in Gmail), allegando lo stato ASC
+2. **Mail di evidenza a Corbelli** (bozza pronta in Gmail, con il punto 4 sull'aggiornamento obbligatorio): Fabrizio vuole mandarla a 1.5 approvata. ⚠️ Corbelli chiede evidenza della *sottomissione*, non della pubblicazione, con termine perentorio al **3 novembre**: se la 1.5 non e' approvata entro il **31/10**, mandarla comunque
 3. **Lunedì 27/10:** scrivere `config/minVersion` = 1.5 su Firebase per forzare l'aggiornamento — solo a 1.5 approvata
-4. **1.6 (build 11) caricata su ASC il 23/10 alle 11:21**, in elaborazione: analytics del percorso, tema stagionale, hint "Questo sei tu" nella lobby del narratore. Il record versione 1.6 non si può creare finché la 1.5 è in verifica: appena approvata, creare la versione, agganciare la build 11, incollare le note e inviare. Universal links rimandati alla 1.7 (AASA + entitlement: troppo rischio per una build che deve passare in 4 giorni)
+4. **1.6 (build 12) caricata su ASC il 23/10 alle 11:28** — usare questa, non la 11: analytics del percorso, tema stagionale, hint "Questo sei tu" nella lobby del narratore. Il record versione 1.6 non si può creare finché la 1.5 è in verifica: appena approvata, creare la versione, agganciare la build 12, incollare le note e inviare. La build 12 aggiunge che il sigillo di stagione resta a chi se l'e' preso (disegno da `allSigils`/`allAuras`, scelta ancora legata alla stagione). Universal links rimandati alla 1.7 (AASA + entitlement: troppo rischio per una build che deve passare in 4 giorni)
 5. Verifica visiva dell'hint narratore (il QR non è scopribile) ancora da fare
 6. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico
 7. Minori dalla review: pareggio nelle votazioni, keep-awake, audio demo del paywall, sfx morti, nodo pubblico leaderboard (1.7), scope di lettura su `/users`
