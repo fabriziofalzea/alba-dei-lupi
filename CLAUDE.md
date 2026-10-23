@@ -263,29 +263,28 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 ## Stato e prossimi passi
 
-**Aggiornato:** 2026-10-23 (sera)
+**Aggiornato:** 2026-10-23 (notte)
 
-**A che punto siamo:** **1.5 (build 10) approvata e LIVE dal 23/10, 12:34 UTC** — l'App Store serve `L'Alba dei Lupi: Lupo Mannaro` v1.5. La rinomina imposta dalla diffida daVinci è quindi completata e pubblicata, 11 giorni prima della scadenza del 3 novembre.
+**A che punto siamo:** **1.6 live su tutti gli store dal 23/10, 20:18 UTC.** Nome live: `L'Alba dei Lupi: Lupo Mannaro` (IT) e `Dawn of the Wolves: Werewolf` (US) — il refuso **"Warewolf"**, che per mesi ha tenuto l'app fuori dalle ricerche per "werewolf", è sparito: il mercato inglese è raggiungibile per la prima volta.
 
-**1.6 (build 12) INVIATA alla verifica il 23/10 alle 15:10**, stato "In attesa di verifica". Apple dichiara fino a 48 ore: build agganciata, conformità crittografica dichiarata ("nessuno degli algoritmi citati"), note di versione IT + EN, rilascio automatico dopo l'approvazione **senza rilascio in più fasi** (con Halloween a sette giorni un rollout graduale sarebbe controproducente). Provata sul simulatore prima dell'invio: hint del narratore visibile, Analytics acceso all'avvio, prezzi USA nuovi nel paywall.
+La rinomina imposta dalla diffida daVinci è completata e pubblicata, 11 giorni prima del termine del 3 novembre.
 
-**Halloween:** evento in-app approvato e pubblicato (IT + EN), **anticipato il 23/10 a 23 ott 19:30 → 1 nov 23:30** e sconto attivo **da subito** fino al 2 nov su 175 paesi (Italia €4,99 → €3,99, USA $5,99 → $4,49), `config/seasonal` scritto su Firebase. Il tema stagionale si accenderà **solo se la 1.6 è live entro il 30**: il codice che lo legge non è nella 1.5.
+**Firebase, stato attuale di `config`:**
+```json
+{"minVersion":"1.6","seasonal":{"from":"2026-10-23","id":"halloween","to":"2026-11-02"}}
+```
+⚠️ `minVersion` **deve essere una stringa**: `needsUpdate()` fa `minimum.split('.')`, e con un numero l'eccezione finisce nel `catch` e il force-update non scatta **senza alcun errore visibile**. La console Firebase lo salva come `123` (numero) di default: va cambiato a mano in `ABC` (String). Verificato il 23/10 che il valore salvato è `'1.6'` di tipo `str`.
 
-**Regola sulla copy degli eventi (dal 23/10): mai date, durate o numeri nel testo.** Il conto alla rovescia lo mostra già Apple sulla scheda ("inizia fra 2 giorni", "finisce fra 2 giorni"), quindi scriverlo è ridondante — e si paga caro, perché nome, descrizioni e immagini sono congelati dopo l'approvazione mentre le date restano modificabili. Copy generica + date mobili = si può anticipare, allungare o accorciare un evento senza rimetterlo in revisione e senza che il testo diventi falso. Caso reale: "Il Pack Completo in offerta per tre notti" è diventato impreciso appena abbiamo anticipato la promo, e non era più correggibile.
-
-Formule che reggono qualsiasi finestra: *"Il Pack Completo a prezzo ridotto"*, *"Tutti i ruoli e la voce del narratore, in offerta"*, *"Sconto sul gioco completo"*.
-
-**Lezione sul tempismo (23/10).** L'evento aveva data di pubblicazione **23 ott 05:30** ma inizio 30 ott: per una settimana la scheda prodotto annunciava uno sconto che non esisteva, dando a chi arrivava un motivo per rimandare l'acquisto. Scoperto controllando il campo "Data e ora di pubblicazione", che è **separato** dalla data di inizio. Regola per i prossimi eventi: la data di pubblicazione non va lasciata al default, va messa vicino all'inizio — oppure lo sconto va fatto partire dalla pubblicazione.
-
-**Cosa si può modificare su un evento già approvato** (verificato sul campo): date di inizio e fine, priorità, paesi — e il salvataggio **non** rimanda in revisione (provato il 23/10: stato rimasto "Approvato · Pubblicato"). Sono invece congelati nome, descrizioni, immagini, badge, deep link e la data di pubblicazione. Cambiare la copy richiede di cancellare l'evento e rifarlo, con nuova revisione.
-
-**Listino USA** gestito a mano dal 23/10 su tutti e quattro i prodotti (singoli $2,99, combo $5,99): era più basso dell'Italia. Apple non lo adegua più da sé. Attenzione: alzare un prezzo di base può sfilare un paese dalle promo attive — verificare sempre dopo ogni modifica.
+**Halloween in corso:** evento in-app approvato e pubblicato, finestra **23 ott 19:30 → 1 nov 23:30**; sconto attivo su 175 paesi fino al 2 nov (Italia €3,99, USA $4,49, resto €/$2,99); tema stagionale acceso dal 23/10 al 2/11 — ora funziona davvero, perché il codice che lo legge è nella 1.6 che è live.
 
 **Prossimi passi:**
-1. **Mail di evidenza a Corbelli — lunedì 2 novembre** (promemoria in calendario alle 9:00). Fabrizio ha deciso il 23/10 di far passare prima Halloween, per fare l'evento senza riaprire il contatto. ⚠️ Il termine perentorio è il **3 novembre**: il 2 è l'ultimo giorno con un minimo di margine, non si rimanda oltre. Segnalato che il rischio è probabilmente invertito — la mail non attira l'attenzione sull'evento, toglie a daVinci il motivo di segnalare l'app ad Apple mentre il termine scorre senza risposta; una segnalazione il 29 ottobre cancellerebbe l'evento. Bozza pronta in Gmail, aggiornata al fatto che la 1.5 è pubblicata e non solo sottomessa
-2. **`config/minVersion`**: Fabrizio ha deciso il 23/10 di aspettare che sia live anche la **1.6**, per forzare una volta sola e consegnare insieme il tema di Halloween. ⚠️ Se al **31/10** la 1.6 non fosse ancora live, impostarlo sulla versione live in quel momento: la conformità al marchio non può restare appesa a una seconda coda Apple
-3. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico
-4. Minori dalla review: pareggio nelle votazioni, keep-awake, audio demo del paywall, sfx morti, nodo pubblico leaderboard, scope di lettura su `/users`
-5. Universal links (AASA + entitlement `associated-domains`) rimandati alla 1.7
+1. **Mail di evidenza a Corbelli — lunedì 2 novembre** (promemoria in calendario alle 9:00), per scelta di Fabrizio di far passare prima Halloween. ⚠️ Termine perentorio **3 novembre**: non rimandare oltre. La bozza è pronta in Gmail; ora il punto 4 sull'aggiornamento obbligatorio **si può mettere al passato**, perché `minVersion` è attivo
+2. **Dopo Corbelli:** valutare dove promuovere l'app. Prima però guardare i dati di percorso della 1.6 (partita creata → giocatore unito → prima notte → partita conclusa): con retention ~7% portare traffico a pagamento significa riempire un secchio bucato. Due settimane di dati prima di spendere
+3. **Classifica vuota**: `ProfileScreen` legge `db.ref('users')` ma la lettura di `/users` è negata (verificato dall'esterno: `Permission denied`). Serve un nodo pubblico `/leaderboard` con solo nome, avatar e partite — aprire `/users` esporrebbe le email
+4. **Login con Apple a metà**: codice ed entitlement `com.apple.developer.applesignin` presenti, manca il provider Apple abilitato in console Firebase
+5. **Schermo che si spegne** durante la partita: nessun keep-awake nel codice
+6. Minori: pareggio nelle votazioni, feedback dopo l'acquisto del Pack Narratore, audio demo del paywall, sfx dei morti
+7. Universal links (AASA + entitlement) rimandati alla 1.7; share del QR per il gioco a distanza resta bloccato dal problema UGC
+8. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`) — cosmetico, e `AI_SYNC.md` contiene voci scadute (dà l'audio narratore EN per mancante, mentre i 35 file ci sono)
 
-**In attesa di Fabrizio:** invio della mail a Corbelli. **In attesa di Apple:** esito della verifica sulla 1.6 (inviata 23/10 15:10). Se approvata entro il 27-28, il tema di Halloween fa in tempo ad accendersi il 30.
+**In attesa di Fabrizio:** mail a Corbelli del 2 novembre.
