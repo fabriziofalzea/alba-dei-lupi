@@ -21,3 +21,5 @@ deploy.sh
 scratch/
 releases/
 screenshots_en/
+.env*
+screenshots_it/

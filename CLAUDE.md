@@ -46,12 +46,14 @@ Regole comportamentali: vedi `../Jarvis/CLAUDE.md` (profilo utente, stile, proat
 
 Freemium con pack IAP:
 
-| Pack | Prezzo | Contenuto |
-|---|---|---|
-| Pack Ombre | €1,99 | strega, figlio_dei_lupi, cacciatore, medium, **indemoniato** |
-| Pack Villaggio | €1,99 | cupido, sindaco, sciamano, mitomane |
-| Pack Narratore | €1,99 | Voce AI narratore |
-| Combo | €4,99 | Tutti e tre |
+| Pack | Italia (base) | Stati Uniti | Contenuto |
+|---|---|---|---|
+| Pack Ombre | €1,99 | $2,99 | strega, figlio_dei_lupi, cacciatore, medium, **indemoniato** |
+| Pack Villaggio | €1,99 | $2,99 | cupido, sindaco, sciamano, mitomane |
+| Pack Narratore | €1,99 | $2,99 | Voce AI narratore |
+| Combo | €4,99 | $5,99 | Tutti e tre |
+
+Il listino USA è gestito a mano dal 23/10/2026 (prima seguiva l'equivalenza automatica di Apple ed era più basso dell'Italia: combo $3,99 contro €4,99). Gli Stati Uniti sono ora un'eccezione manuale su tutti e quattro i prodotti: Apple non li adegua più da sé, quindi vanno rivisti a mano. Tutti gli altri 174 paesi restano agganciati alla base Italia.
 
 Prodotti App Store Connect: `pack_ombre`, `pack_villaggio`, `pack_narratore`, `pack_combo`.
 
@@ -176,7 +178,7 @@ Meccanismo: chiave Firebase `config/seasonal` = `{ id, from, to }` → l'app acc
 
 | Evento | Finestra | Invio evento entro | Offerta |
 |---|---|---|---|
-| Halloween 2026 | 30 ott – 1 nov | 24 ottobre | Combo €4,99 → €3,99 |
+| Halloween 2026 | 30 ott – 1 nov | 24 ottobre | Combo €4,99 → €3,99 · USA $5,99 → $4,49 |
 | Feste di Natale | 18 dic – 6 gen | 11 dicembre | Combo scontato |
 | Carnevale 2027 | 5 – 9 febbraio | 30 gennaio | facoltativa |
 | Halloween 2027 | 29 – 31 ottobre | 22 ottobre 2027 | come 2026 |
@@ -261,16 +263,17 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 ## Stato e prossimi passi
 
-**Aggiornato:** 2026-10-22
+**Aggiornato:** 2026-10-23
 
-**A che punto siamo:** rinomina in corso per la diffida daVinci (scadenza invio Apple: **3 novembre 2026**). Branch `feat/rename-alba-dei-lupi`: commit `229dc5a` (sorgente, i18n, privacy, wordmark, titolo, appName) + `24144cb` (i 3 bloccanti della review: `CFBundleDisplayName`, bundle iOS risincronizzato, `MARKETING_VERSION` 1.5, grammatica onboarding, `APP_STORE_URL` senza slug). Build pulita, `cap sync ios` eseguito (serve `LANG=en_US.UTF-8`, altrimenti CocoaPods fallisce), zero occorrenze del vecchio nome nel bundle iOS. Repo GitHub rinominato in `fabriziofalzea/alba-dei-lupi`. Pacchetto ASO pronto in `../Product & Growth/aso_alba_dei_lupi_2026-10.md`.
+**A che punto siamo:** rinomina conclusa e **1.5 (build 7) in attesa di verifica** su App Store Connect, inviata con 12 giorni di margine sulla scadenza daVinci del 3 novembre. Dominio nuovo `alba-dei-lupi.vercel.app` in produzione, vecchio progetto tenuto come ponte (solo `/api/*` + redirect 308) perché la 1.4 ha il dominio hardcoded per la Voce AI. Le regole Firebase sono state applicate: `config` è leggibile pubblicamente e non scrivibile — verificato il 23/10, quindi force-update e tema stagionale sono sbloccati. Evento in-app **"Halloween 2026"** (id 6825875713) compilato in italiano e inglese, immagini 1920×1080 e 1080×1920 caricate, badge "Evento speciale", 30/10 18:00 → 1/11 23:30 CET, deep link `lupus://evento`. Sconto temporaneo sul Pack Completo creato in ASC per il 30 ott → 2 nov: Italia 4,99 → 3,99 € (−20%), Stati Uniti 5,99 → 4,49 $ (−25%). Il 23/10 il listino USA è stato alzato a mano su tutti e quattro i prodotti (singoli 1,99 → 2,99 $, combo 3,99 → 5,99 $): era più basso dell'Italia e lo sconto del bundle valeva il doppio. Attenzione: alzare il prezzo di base ha tolto gli USA dal cambio temporaneo esistente (la promo era scesa a 174 paesi) ed è servito ricrearlo come cambio a sé — verificare sempre dopo ogni modifica di listino. `config/seasonal` scritto su Firebase: `{id:"halloween", from:"2026-10-28", to:"2026-11-02"}`. ⚠️ Il codice che lo legge sta nella **1.6**, non nella 1.5 (build 10, inviata alle ~18 del 22/10, prima dei commit del tema delle 19:21): con la 1.6 non pubblicata, il tema stagionale non si accenderà per nessuno ad Halloween 2026. L'evento App Store e lo sconto funzionano lo stesso, perché vivono lato store.
 
 **Prossimi passi:**
-1. Merge su `master` + nuovo progetto Vercel `alba-dei-lupi`; il progetto attuale resta come ponte: solo `/api/*` + redirect 308 del resto (la 1.4 ha il dominio hardcoded per la Voce AI)
-2. Aggiornare le 5 costanti del dominio in `App.jsx` (225, 801, 1625, 3169, 3231) e aggiungere il nuovo dominio ai return URL Apple e ai domini autorizzati Firebase
-3. Rigenerare i 5 screenshot IT/EN (mostrano il wordmark vecchio) e compilare la scheda su App Store Connect
-4. Archive 1.5 (build 7) e invio: **target 30 ottobre**, per avere margine su un eventuale rifiuto
-5. Evidenza formale della sottomissione a Corbelli entro il 3 novembre
-6. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico, dopo l'invio
+1. **Entro il 24/10:** cliccare "Aggiungi alla verifica" sull'evento in-app (invio ad Apple, resta a Fabrizio)
+2. **Sabato 24/10:** mail di evidenza formale a Corbelli (bozza pronta in Gmail), allegando lo stato ASC
+3. **Lunedì 27/10:** scrivere `config/minVersion` = 1.5 su Firebase per forzare l'aggiornamento — solo a 1.5 approvata
+4. 1.6: eventi analytics del journey, tema stagionale, hint "Questo sei tu" nella lobby del narratore. Non inviabile finché la 1.5 è in verifica
+5. Verifica visiva dell'hint narratore (il QR non è scopribile) ancora da fare
+6. Allineare la documentazione interna (`AI_SYNC.md`, `README.md`, `SETUP.md`, guide narratore) — cosmetico
+7. Minori dalla review: pareggio nelle votazioni, keep-awake, audio demo del paywall, sfx morti, nodo pubblico leaderboard (1.7), scope di lettura su `/users`
 
-**In attesa di Fabrizio:** scelta fra nome lungo + sottotitolo AI (B) e nome corto + "Il gioco del lupo mannaro" (A); se localizzare il nome sotto l'icona per gli utenti EN.
+**In attesa di Fabrizio:** esito della verifica Apple sulla 1.5; universal links (file AASA + entitlement `associated-domains`) da mettere o no nella 1.6 — domanda ancora senza risposta.
