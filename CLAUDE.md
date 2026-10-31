@@ -277,8 +277,14 @@ La rinomina imposta dalla diffida daVinci è completata e pubblicata, 11 giorni 
 
 **Halloween in corso:** evento in-app approvato e pubblicato, finestra **23 ott 19:30 → 1 nov 23:30**; sconto attivo su 175 paesi fino al 2 nov (Italia €3,99, USA $4,49, resto €/$2,99); tema stagionale acceso dal 23/10 al 2/11 — ora funziona davvero, perché il codice che lo legge è nella 1.6 che è live.
 
+**Diffida daVinci — stato al 31/10.** Il **29 ottobre** daVinci ha risposto: prende atto di quanto dichiarato "in buona fede", apprezza "la spontanea adesione", ma **nega un consenso preventivo** ("non possiamo garantire preventivamente un consenso incondizionato rispetto alle modifiche attuate, né controllare a richiesta i relativi siti e app nei dettagli") e si riserva di perseguire *ulteriori* violazioni. Chiude con "grazie per la collaborazione".
+
+Lettura: la liberatoria preventiva non arriverà mai e **non va richiesta di nuovo** — otterremmo un no esplicito. L'impegno della loro del 19 ottobre ("a condizione dell'esatto, completo e tempestivo adempimento… riterrà la questione definita e rinuncerà a promuovere azioni giudiziarie") **non è stato ritirato**: la strategia è constatare l'adempimento e lasciare che siano le loro parole a chiudere. Inoltre il 22/10 erano stati invitati a indicare entro 5 giorni altri elementi da modificare e il 29/10 non ne hanno indicato nessuno: perimetro chiuso per decadenza.
+
+Risposta pronta in bozza Gmail (thread "Marchio commerciale LUPUS IN TABULA (R)"), con tre allegati in `prove_davinci_2026-10-31/`: scheda App Store italiana, scheda americana, e il vecchio indirizzo che reindirizza al nuovo. Termine perentorio: **3 novembre**.
+
 **Prossimi passi:**
-1. **Mail di evidenza a Corbelli — lunedì 2 novembre** (promemoria in calendario alle 9:00), per scelta di Fabrizio di far passare prima Halloween. ⚠️ Termine perentorio **3 novembre**: non rimandare oltre. La bozza è pronta in Gmail; ora il punto 4 sull'aggiornamento obbligatorio **si può mettere al passato**, perché `minVersion` è attivo
+1. **Inviare la risposta a Corbelli**: bozza pronta, bastano i tre allegati trascinati da `prove_davinci_2026-10-31/`. Non chiedere di nuovo la liberatoria
 2. **Dopo Corbelli:** valutare dove promuovere l'app. Prima però guardare i dati di percorso della 1.6 (partita creata → giocatore unito → prima notte → partita conclusa): con retention ~7% portare traffico a pagamento significa riempire un secchio bucato. Due settimane di dati prima di spendere
 3. **Classifica vuota**: `ProfileScreen` legge `db.ref('users')` ma la lettura di `/users` è negata (verificato dall'esterno: `Permission denied`). Serve un nodo pubblico `/leaderboard` con solo nome, avatar e partite — aprire `/users` esporrebbe le email
 4. **Login con Apple a metà**: codice ed entitlement `com.apple.developer.applesignin` presenti, manca il provider Apple abilitato in console Firebase
