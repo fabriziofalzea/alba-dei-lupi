@@ -287,6 +287,18 @@ Due scelte di merito, da ricordare se la pratica si riapre:
 
 Prove allegate e, soprattutto, **link pubblici verificabili** nel testo (schede App Store IT e US, reindirizzamento del vecchio dominio). Copie in `prove_davinci_2026-10-31/`.
 
+**Lettura dei risultati (9 novembre 2026, fonte RevenueCat per-customer).**
+
+Nuovi utenti a settimana: 31/8 → 9 · 7/9 → 8 · 14/9 → 7 · 28/9 → 14 · **5/10 → 38** · 12/10 → 49 · 19/10 → 46 · 26/10 → 41 · 2/11 → 10. Per mese: set 25, ott 182, nov 15 (in 9 giorni).
+
+⚠️ **Il picco di ottobre è stagionalità di Halloween, non merito nostro**: parte nella prima settimana di ottobre, due settimane prima della rinomina e tre prima della 1.6 e dell'evento. Il calo di novembre non è un crollo ma la fine del picco; a ~1,7/giorno siamo comunque circa il doppio di settembre (0,8). Da ricordare quando si valuterà Natale: il confronto va fatto con lo stesso periodo, non col mese precedente.
+
+⚠️ **Lo sconto non ha venduto.** Acquisti di produzione nel periodo: 22/10 Pack Completo (IT) — **il giorno prima** che lo sconto partisse — 25/10 Pack Narratore (IT), 1/11 Pack Narratore (JP). Del Pack Completo, l'unico scontato, zero copie durante tutta la finestra 23/10–2/11. I due acquisti del periodo sono a prezzo pieno e sono entrambi Voce AI. Campione minuscolo, ma il segnale è: spingere il narratore, non il prezzo.
+
+**Mercato inglese fermo**: 17 giorni dopo la correzione di "Warewolf", zero utenti e zero valutazioni negli USA. Attivi: 13 IT + 1 JP (ed è giapponese l'unico acquisto estero). Correggere il nome era necessario, non sufficiente.
+
+**Force update confermato**: 14 attivi su 14 sulla 1.6. Valutazioni IT da 11 a 12, media 5,0.
+
 **Prossimi passi:**
 1. **Dopo Corbelli:** valutare dove promuovere l'app. Prima però guardare i dati di percorso della 1.6 (partita creata → giocatore unito → prima notte → partita conclusa): con retention ~7% portare traffico a pagamento significa riempire un secchio bucato. Due settimane di dati prima di spendere
 2. **Classifica vuota**: `ProfileScreen` legge `db.ref('users')` ma la lettura di `/users` è negata (verificato dall'esterno: `Permission denied`). Serve un nodo pubblico `/leaderboard` con solo nome, avatar e partite — aprire `/users` esporrebbe le email
