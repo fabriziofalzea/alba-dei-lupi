@@ -307,6 +307,21 @@ Se si vuole davvero l'analytics nell'app serve il **plugin nativo** (`@capacitor
 
 ✅ **Ma il funnel non serve chiederlo ad Analytics: è già nel Realtime Database.** Il nodo `games` contiene ogni partita con giocatori, fasi ed esito — dati nativi, reali, già raccolti. Si esporta dalla console (⋮ → Esporta JSON sul nodo `games`) e si calcola il funnel in locale, senza toccare l'app né le regole.
 
+✅ **IMBUTO REALE, ricavato dal Realtime Database (9/11/2026, 734 partite da aprile).** Non serviva Analytics: il nodo `games` conteneva già tutto. Export della console analizzato con `analisi/funnel2.py` e `analisi/confronto.py`.
+
+| Stadio | Partite | % |
+|---|---|---|
+| Create | 734 | 100% |
+| Qualcuno inquadra il QR | 567 | 77% |
+| Superano la lobby (fase ≠ `waiting`) | ~372 | 51% |
+| **Concluse** (fase `ended`) | **108** | **14,7%** |
+
+🔴 **Il collo di bottiglia è la lobby, non la retention.** 353 partite su 734 (48%) restano in `waiting` per sempre. Il narratore inserisce in media **5 giocatori** ma solo **3 inquadrano il QR**: in metà delle partite qualcuno non riceve mai il ruolo e il gioco non può partire. Le persone sono già fisicamente nella stanza — si incagliano sul passaggio del QR.
+
+**Confronto prima/dopo la 1.6** (653 vs 77 partite): tutti inquadrano il QR 47,2% → 66,2%; giocatori entrati in media 3,0 → 4,4; superano la lobby 50,7% → 59,7%; concluse 13,9% → 20,8%. Incoraggiante ma **non dimostrato**: campione piccolo e periodo sovrapposto a Halloween. Rifare il confronto a dicembre, con stagionalità neutra.
+
+⚠️ **Trappola di misura da ricordare:** la 1.6 scrive `dayNum` già alla creazione (31 partite su 31 ferme in lobby ce l'hanno, contro 94 su 322 prima). Qualsiasi metrica basata su `dayNum`/`narratorLog` è quindi inutilizzabile per confronti prima/dopo: **usare `phase`**, che è affidabile.
+
 **Prossimi passi:**
 1. **Dopo Corbelli:** valutare dove promuovere l'app. Prima però guardare i dati di percorso della 1.6 (partita creata → giocatore unito → prima notte → partita conclusa): con retention ~7% portare traffico a pagamento significa riempire un secchio bucato. Due settimane di dati prima di spendere
 2. **Classifica vuota**: `ProfileScreen` legge `db.ref('users')` ma la lettura di `/users` è negata (verificato dall'esterno: `Permission denied`). Serve un nodo pubblico `/leaderboard` con solo nome, avatar e partite — aprire `/users` esporrebbe le email
