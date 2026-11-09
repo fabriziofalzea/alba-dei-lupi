@@ -299,6 +299,14 @@ Nuovi utenti a settimana: 31/8 → 9 · 7/9 → 8 · 14/9 → 7 · 28/9 → 14 �
 
 **Force update confermato**: 14 attivi su 14 sulla 1.6. Valutazioni IT da 11 a 12, media 5,0.
 
+🔴 **Analytics: la correzione della 1.6 NON funziona sull'app (verificato in console il 9/11).** Eventi degli ultimi 28 giorni (12 ott – 8 nov): **58 in tutto, 11 utenti**, contro ~150 nuovi utenti registrati da RevenueCat nello stesso periodo. Dettaglio: page_view 25, session_start 13, first_visit 11, game_created 4, paywall_view 3, user_engagement 2. **`player_joined`, `first_night_started` e `game_finished`: zero occorrenze.** Tutta l'attività è concentrata fra il 19 e il 24 ottobre e poi il grafico è piatto a zero — cioè proprio da quando la 1.6 è live.
+
+Spiegazione più probabile: **Firebase Analytics per il Web (gtag) non funziona dentro la WebView di Capacitor**. L'app nativa si carica da uno schema personalizzato (`capacitor://`), GA4 non riesce a impostare il cookie `_ga` e l'SDK fallisce in silenzio. I pochi eventi presenti sono quasi certamente i test del 22-23 ottobre sul dev server (http://localhost, dove infatti funzionava) e sul simulatore. ⚠️ Da qui l'errore commesso il 23/10: aver dichiarato chiuso il difetto sulla base di una prova fatta **solo sul web**. Per confermare servirebbe la dimensione piattaforma in GA o una prova su device vero.
+
+Se si vuole davvero l'analytics nell'app serve il **plugin nativo** (`@capacitor-firebase/analytics` + `GoogleService-Info.plist`), non l'SDK web.
+
+✅ **Ma il funnel non serve chiederlo ad Analytics: è già nel Realtime Database.** Il nodo `games` contiene ogni partita con giocatori, fasi ed esito — dati nativi, reali, già raccolti. Si esporta dalla console (⋮ → Esporta JSON sul nodo `games`) e si calcola il funnel in locale, senza toccare l'app né le regole.
+
 **Prossimi passi:**
 1. **Dopo Corbelli:** valutare dove promuovere l'app. Prima però guardare i dati di percorso della 1.6 (partita creata → giocatore unito → prima notte → partita conclusa): con retention ~7% portare traffico a pagamento significa riempire un secchio bucato. Due settimane di dati prima di spendere
 2. **Classifica vuota**: `ProfileScreen` legge `db.ref('users')` ma la lettura di `/users` è negata (verificato dall'esterno: `Permission denied`). Serve un nodo pubblico `/leaderboard` con solo nome, avatar e partite — aprire `/users` esporrebbe le email
