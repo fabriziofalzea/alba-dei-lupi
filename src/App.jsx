@@ -3194,6 +3194,7 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const [chronicleVersion, setChronicleVersion] = useState(0); // forza il ridisegno quando arriva un evento
   const [narrationLog, setNarrationLog] = useState([]);
   const [readyCount, setReadyCount] = useState(0);
+  const [joinedIds, setJoinedIds] = useState({}); // chi ha inquadrato il QR (deviceToken), anche se non ha ancora premuto "pronto"
   const [winner, setWinner] = useState(null);
   const [showEliminate, setShowEliminate] = useState(false);
   const [showCupidoModal, setShowCupidoModal] = useState(null); // id del primo innamorato
@@ -3345,6 +3346,25 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
   const linkLovers = useCallback((a, b) => ({ [a]: [b], [b]: [a] }), []);
   const [dawnInfo, setDawnInfo] = useState(null); // info GM sull'alba: { victimId, poisonVictimId, stregaHealed, figlioTransformed, mediumResults, sciamanoResult }
 
+  // Lobby: quando il giocatore il cui QR è a schermo diventa pronto, il carosello
+  // passa da solo al prossimo che manca. Prima serviva la freccia e nessuno lo capiva:
+  // sui dati di aprile-novembre il narratore inseriva 5 giocatori ma ne entravano 3.
+  // Si salta solo al passaggio da non pronto a pronto, così il narratore può ancora
+  // tornare a guardare il QR di chi è già dentro senza essere spostato.
+  const prontiPrimaRef = useRef({});
+  useEffect(() => {
+    if (phase !== 'waiting' || !players.length) return;
+    const attuale = players[activeQrIndex];
+    const eraPronto = prontiPrimaRef.current[attuale?.id];
+    const ora = !!pStates[attuale?.id]?.ready;
+    prontiPrimaRef.current = Object.fromEntries(players.map(p => [p.id, !!pStates[p.id]?.ready]));
+    if (!attuale || eraPronto || !ora) return;
+    for (let k = 1; k < players.length; k++) {
+      const j = (activeQrIndex + k) % players.length;
+      if (!pStates[players[j].id]?.ready) { setActiveQrIndex(j); return; }
+    }
+  }, [pStates, phase, players, activeQrIndex]);
+
   // Firebase listener for ready count and night votes
   useEffect(()=>{
     if(!db || !gameId) return;
@@ -3353,6 +3373,8 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
       const data = snap.val()||{};
       const playersData = data.players||{};
       setReadyCount(Object.values(playersData).filter(p=>p.ready).length);
+      const entrati = Object.fromEntries(Object.entries(playersData).map(([id, p]) => [id, !!p?.deviceToken]));
+      setJoinedIds(prev => JSON.stringify(prev) === JSON.stringify(entrati) ? prev : entrati);
       setPStates(prev => {
         let changed = false;
         const next = {...prev};
@@ -4369,6 +4391,28 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
               {t('gameMaster.waitingScanQr')}
             </p>
 
+            {/* Chi è dentro e chi manca, in un colpo d'occhio: tocchi un nome e compare il suo QR.
+                Grigio = deve ancora inquadrare, oro = ha inquadrato ma non ha premuto "pronto", verde = pronto. */}
+            <div className="flex flex-wrap justify-center gap-1.5 mb-2 w-full max-w-sm">
+              {players.map((p, i) => {
+                const pronto = !!pStates[p.id]?.ready;
+                const entrato = !!joinedIds[p.id];
+                const stile = pronto
+                  ? {background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.5)', color:'#4ade80'}
+                  : entrato
+                  ? {background:'rgba(226,201,126,0.12)', border:'1px solid rgba(226,201,126,0.45)', color:'#e2c97e'}
+                  : {background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.14)', color:'#9ca3af'};
+                return (
+                  <button key={p.id} onClick={() => setActiveQrIndex(i)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-bold max-w-[7.5rem] truncate transition-all active:scale-95"
+                    style={{...stile, outline: i === activeQrIndex ? '2px solid rgba(255,255,255,0.6)' : 'none', outlineOffset: 1}}>
+                    {pronto ? '✓ ' : ''}{p.name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-gray-600 text-[10px] text-center mb-4">{t('gameMaster.chipLegend')}</p>
+
             <div className="flex items-center gap-4 mb-6 w-full max-w-sm">
               <button 
                 onClick={() => setActiveQrIndex(i => Math.max(0, i - 1))}
@@ -4433,7 +4477,9 @@ function GameMasterScreen({gameId, players, onEndGame, onBack, onBackToCreate, u
               {readyCount === players.length ? (
                 <p className="text-green-400 text-sm font-bold flex items-center justify-center gap-2"><span className="animate-spin">⏳</span> {t('gameMaster.startingSoon')}</p>
               ) : (
-                <p className="text-gray-500 text-sm italic">{t('gameMaster.waitingForPlayers')}</p>
+                <p className="text-gray-400 text-sm">
+                  {t('gameMaster.missingPlayers', {names: players.filter(p => !pStates[p.id]?.ready).map(p => p.name).join(', ')})}
+                </p>
               )}
             </div>
 
