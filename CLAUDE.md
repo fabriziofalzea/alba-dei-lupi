@@ -263,7 +263,12 @@ Pannello nella schermata del narratore con il resoconto notte per notte, per rac
 
 ## Stato e prossimi passi
 
-**Aggiornato:** 2026-10-23 (notte)
+**Aggiornato:** 2026-11-18
+
+**1.7 in preparazione (18/11):** lobby con fila di nomi (grigio = da inquadrare, oro = inquadrato non pronto, verde = pronto; tap → mostra quel QR), QR che avanza da solo quando il giocatore mostrato preme pronto, "Mancano: …" al posto di "In attesa". Provata in anteprima con partita simulata (poi cancellata). Commit `f1d1205`. Build 1.7 (13) caricata, versione 1.7 creata in ASC con rilascio automatico.
+Metadati salvati: sottotitolo IT "Gioco di gruppo col narratore", US "Social deduction party game"; categoria Giochi › **Giochi da tavolo** (prima) + Famiglia; keyword IT `lupus,impostore,società,tavolo,carte,festa,spia,werewolf,deduzione,villaggio,mafia,bluff,amici`; US `impostor,mafia,secret,hidden,traitor,spy,group,friends,bluff,multiplayer,village,roles,night,town`. Regola: "lupus" solo nelle keyword nascoste, mai nel testo visibile; niente "among" (marchio Among Us).
+**Prossimo:** a build elaborata → collegarla alla 1.7, crittografia "Nessuno degli algoritmi", invio in revisione (conferma di Fabrizio). Dopo il live: alzare `minVersion` solo se serve; misurare ranking per lupus/impostore/werewolf a 2 settimane.
+
 
 **A che punto siamo:** **1.6 live su tutti gli store dal 23/10, 20:18 UTC.** Nome live: `L'Alba dei Lupi: Lupo Mannaro` (IT) e `Dawn of the Wolves: Werewolf` (US) — il refuso **"Warewolf"**, che per mesi ha tenuto l'app fuori dalle ricerche per "werewolf", è sparito: il mercato inglese è raggiungibile per la prima volta.
 
